@@ -197,8 +197,6 @@ function M.setup()
 			M.list_sessions()
 		elseif not sub then
 			M.sessionizer()
-		else
-			vim.notify("Subcomando inválido. Use: new | attach [+1|-1|<número>] | remove | list", vim.log.levels.ERROR)
 		end
 	end, { nargs = "*" })
 end
