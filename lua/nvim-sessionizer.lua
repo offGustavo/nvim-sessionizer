@@ -39,7 +39,7 @@ function M.new_session()
 			vim.fn.jobstart(table.concat(cmd, " "), { detach = true })
 			vim.defer_fn(function()
 				vim.cmd("connect " .. socket)
-				vim.notify("Sessão criada e conectada: " .. name)
+				vim.notify("Session created and connected: " .. name)
 				M.update_sessions()
 			end, 300)
 		end
@@ -49,13 +49,13 @@ end
 function M.attach_session(arg)
 	M.update_sessions()
 	if #M.sessions == 0 then
-		vim.notify("Nenhuma sessão encontrada", vim.log.levels.WARN)
+		vim.notify("No sessions found", vim.log.levels.WARN)
 		return
 	end
 
 	if arg == "+1" or arg == "-1" or tonumber(arg) then
 		if not M.current_index then
-			vim.notify("Sessão atual não encontrada, selecione manualmente.", vim.log.levels.WARN)
+			vim.notify("Current session not found, please select manually.", vim.log.levels.WARN)
 			return
 		end
 
@@ -77,14 +77,14 @@ function M.attach_session(arg)
 		local next_session = M.sessions[new_index]
 		local socket = sessions_dir .. "/" .. next_session
 		vim.cmd("connect " .. socket)
-		vim.notify("Conectado à sessão: " .. next_session .. " (índice " .. new_index .. ")")
+		vim.notify("Connected to session: " .. next_session .. " (index " .. new_index .. ")")
 		M.current_index = new_index
 	else
-		vim.ui.select(M.sessions, { prompt = "Selecionar sessão para conectar:" }, function(choice)
+		vim.ui.select(M.sessions, { prompt = "Select a session to connect:" }, function(choice)
 			if choice then
 				local socket = sessions_dir .. "/" .. choice
 				vim.cmd("connect " .. socket)
-				vim.notify("Conectado à sessão: " .. choice)
+				vim.notify("Connected to session: " .. choice)
 				M.update_sessions()
 			end
 		end)
@@ -94,15 +94,15 @@ end
 function M.remove_session()
 	M.update_sessions()
 	if #M.sessions == 0 then
-		vim.notify("Nenhuma sessão para remover", vim.log.levels.WARN)
+		vim.notify("No sessions to remove", vim.log.levels.WARN)
 		return
 	end
 
-	vim.ui.select(M.sessions, { prompt = "Selecionar sessão para remover:" }, function(choice)
+	vim.ui.select(M.sessions, { prompt = "Select a session to remove:" }, function(choice)
 		if choice then
 			local socket = sessions_dir .. "/" .. choice
 			vim.fn.delete(socket)
-			vim.notify("Sessão removida: " .. choice)
+			vim.notify("Session removed: " .. choice)
 			M.update_sessions()
 		end
 	end)
@@ -111,14 +111,14 @@ end
 function M.list_sessions()
 	M.update_sessions()
 	if #M.sessions == 0 then
-		vim.notify("Nenhuma sessão ativa", vim.log.levels.INFO)
+		vim.notify("No active sessions", vim.log.levels.INFO)
 	else
 		local formatted = {}
 		for i, name in ipairs(M.sessions) do
-			local mark = (i == M.current_index) and "(*)" or "  "
-			table.insert(formatted, string.format("%s %d:%s", mark,i, name ))
+			local mark = (i == M.current_index) and "(*)" or "   "
+			table.insert(formatted, string.format("%s %d:%s", mark, i, name))
 		end
-		vim.notify("Sessões:\n" .. table.concat(formatted, "\n"))
+		vim.notify("Sessions:\n" .. table.concat(formatted, "\n"))
 	end
 end
 
@@ -130,7 +130,7 @@ function M.sessionizer()
 	local function select_project(callback)
 		local results = vim.fn.systemlist("zoxide query -l -s")
 		if #results == 0 then
-			vim.notify("Nenhum diretório encontrado pelo zoxide", vim.log.levels.WARN)
+			vim.notify("No directories found by zoxide", vim.log.levels.WARN)
 			return
 		end
 
@@ -147,7 +147,7 @@ function M.sessionizer()
 		end
 
 		vim.ui.select(items, {
-			prompt = "Selecionar Projeto:",
+			prompt = "Select a project:",
 			format_item = function(item)
 				return item.display
 			end,
@@ -155,7 +155,7 @@ function M.sessionizer()
 			if choice and choice.path then
 				callback(choice.path)
 			else
-				vim.notify("Nenhum projeto selecionado", vim.log.levels.WARN)
+				vim.notify("No project selected", vim.log.levels.WARN)
 			end
 		end)
 	end
@@ -170,14 +170,14 @@ function M.sessionizer()
 			or vim.fn.getftype(socket) == "socket"
 		then
 			vim.cmd("connect " .. socket)
-			vim.notify("Conectado à sessão existente: " .. session_name)
+			vim.notify("Connected to existing session: " .. session_name)
 		else
 			local cmd = string.format('nohup nvim --listen "%s" -c "cd %s" >/dev/null 2>&1 &', socket, selected_path)
 			vim.fn.system(cmd)
 
 			vim.defer_fn(function()
 				vim.cmd("connect " .. socket)
-				vim.notify("Nova sessão criada: " .. session_name)
+				vim.notify("New session: " .. session_name)
 				M.update_sessions()
 			end, 500)
 		end
