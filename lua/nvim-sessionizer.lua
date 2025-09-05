@@ -32,7 +32,7 @@ function M.update_sessions()
 end
 
 function M.new_session()
-	vim.ui.input({ prompt = "Nome da nova sessão: " }, function(name)
+	vim.ui.input({ prompt = "Session name:" }, function(name)
 		if name and name ~= "" then
 			local socket = sessions_dir .. "/" .. name
 			local cmd = { "nohup", "nvim", "--listen", socket, ">/dev/null", "2>&1", "&" }
@@ -115,8 +115,8 @@ function M.list_sessions()
 	else
 		local formatted = {}
 		for i, name in ipairs(M.sessions) do
-			local mark = (i == M.current_index) and " [ATUAL]" or ""
-			table.insert(formatted, string.format("%d: %s%s", i, name, mark))
+			local mark = (i == M.current_index) and "(*)" or "  "
+			table.insert(formatted, string.format("%s %d:%s", mark,i, name ))
 		end
 		vim.notify("Sessões:\n" .. table.concat(formatted, "\n"))
 	end
