@@ -8,9 +8,8 @@ M.current_index = nil
 
 local config = {
 	no_zoxide = false,
-	search_dirs = { "~/projects", "~/work" },
-	fd_cmd = "fd --type d --max-depth 1",
-	find_cmd = "find %s -type d -maxdepth 1",
+	search_dirs = { "~/projects", "~/work" }, 
+  max_depth = 3,
 }
 
 local function command_exists(cmd)
@@ -191,7 +190,7 @@ local function select_project(callback)
 
 	if command_exists("fd") then
 		cmd = string.format("fd --type d --max-depth %d '' %s",
-			config.fd_max_depth or 3,
+			config.max_depth or 3,
 			table.concat(existing_dirs, " "))
 	elseif command_exists("find") then
 		cmd = string.format("find %s -mindepth 1 -maxdepth %d -type d",
