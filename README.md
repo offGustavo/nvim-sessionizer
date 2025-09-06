@@ -1,9 +1,7 @@
 # Nvim Sessionizer
 Neovim Session Manager
 
-⚠️ THIS IS NOT A PROPER RELEASE — THIS PLUGIN IS IN VERY ALPHA STAGE ⚠️
-
-# READ THE NOTES
+## ⚠️ THIS IS NOT A PROPER RELEASE — THIS PLUGIN IS IN VERY ALPHA STAGE ⚠️
 
 > [!IMPORTANT]
 > This is not a real plugin, at the moment it's more like a proof of concept, keep that in mind
@@ -17,16 +15,14 @@ Neovim Session Manager
 ## Requirements
 
 - Neovim 0.12
-- [ajeetdsouza/zoxide: A smarter cd command. Supports all major shells.](https://github.com/ajeetdsouza/zoxide)
+- [ajeetdsouza/zoxide](https://github.com/ajeetdsouza/zoxide) or [sharkdp/fd](https://github.com/sharkdp/fd) or find
+
 
 ## What is "sessionizer"?
 
-This is a version of [ThePrimeagen/tmux-sessionizer](https://github.com/ThePrimeagen/tmux-sessionizer) for Neovim, using the new capabilities from the server/client architecture. At the moment it uses zoxide to create sessions (because that's what I use), but it should offer `fd` or `find` like tmux-sessionizer.
+This is a version of [ThePrimeagen/tmux-sessionizer](https://github.com/ThePrimeagen/tmux-sessionizer) for Neovim, using the new capabilities from the server/client architecture. 
 
 This (not)plugin will be a way to manage sessions: create them, attach to them, and delete. It enables you to create sessions, which are Neovim servers running in the background, attach to them with the `--remote-ui` flag and `:connect` Ex-command.
-
-And again, this is not a proper plugin, and it may have some breaking changes during development or with the 0.12 release.
-
 
 ## What This (Non)Plugin Doesn't Want to Be
 
@@ -37,20 +33,56 @@ My goal is not to create a terminal multiplexer on top of Neovim. It is just a s
 ### With [folke/lazy.nvim](https://github.com/folke/lazy.nvim)
 
 ```lua
-return {
+{
   "offGustavo/nvim-sessionizer",
-  lazy = false,
-  cmd = "Sessionizer",
   config = function()
-    require("nvim-sessionizer").setup()
-    vim.keymap.set("n", "<A-o>", ":Sessionizer<CR>", { silent = true, desc = "Create a new session with zoxide" })
-    vim.keymap.set("n", "<A-n>", ":Sessionizer new<CR>", { silent = true, desc = "Create a new session in the current dir" })
-    vim.keymap.set("n", "<A-u>", ":Sessionizer attach<CR>", { silent = true, desc = "Attach to a session with vim.ui.select" })
-    vim.keymap.set("n", "<A-S-0>", ":Sessionizer attach +1<CR>", { silent = true, desc = "Go to next session" })
-    vim.keymap.set("n", "<A-S-9>", ":Sessionizer attach -1<CR>", { silent = true, desc = "Go to previous session" })
-    vim.keymap.set("n", "<A-x>", ":Sessionizer remove<CR>", { silent = true })
-    vim.keymap.set("n", "<A-s>", ":Sessionizer list<CR>", { silent = true, desc = "List sessions" })
+require("nvim-sessionizer").setup({
+    -- Disable Zoxide integration.
+    -- Set this to true if:
+    --   1. You don't have Zoxide installed, or
+    --   2. You prefer not to use Zoxide for project selection.
+    no_zoxide = false,
+
+    -- A list of directories where Sessionizer will search for projects.
+    -- Each entry should be an absolute path or use ~ for the home directory.
+    -- Example:
+    --   { "~/Projects", "~/Work" }
+    search_dirs = { "~/my_dir" },
+
+    -- Maximum search depth for fd or find when listing projects.
+    -- This controls how many directory levels are scanned.
+    -- Example:
+    --   max_depth = 3 means: search up to 3 subdirectory levels deep.
+    max_depth = 1,
+})
+    vim.keymap.set("n", "<A-o>", function()
+      require("nvim-sessionizer").sessionizer()
+    end, { silent = true, desc = "Create an new session wiht zoxide" })
+    vim.keymap.set("n", "<A-n>", function()
+      require("nvim-sessionizer").new_session()
+    end, { silent = true, desc = "Create an new session in the current dir" })
+    vim.keymap.set("n", "<A-u>", function()
+      require("nvim-sessionizer").attach_session()
+    end, { silent = true, desc = "Attach to and sessins with vim.ui.select" })
+    vim.keymap.set("n", "<A-S-0>", function()
+      require("nvim-sessionizer").attach_session("+1")
+    end, { silent = true, desc = "Go to next session" })
+    vim.keymap.set("n", "<A-S-9>", function()
+      require("nvim-sessionizer").attach_session("-1")
+    end, { silent = true, desc = "Go to previous session" })
+    vim.keymap.set("n", "<A-x>", function()
+      require("nvim-sessionizer").remove_session()
+    end, { silent = true })
+    vim.keymap.set("n", "<A-s>", function()
+      require("nvim-sessionizer").list_sessions()
+    end, { silent = true, desc = "List sessions" })
     vim.keymap.set("n", "<A-d>", ":detach<CR>", { silent = true, desc = "Detach current session" })
+    for i = 1, 9, 1 do
+      vim.keymap.set("n", "<C-" .. i .. ">", function()
+        require("nvim-sessionizer").attach_session(i)
+      end, { silent = true, desc = "Go to " .. i .. "session" })
+    end
+
   end,
 }
 ```
