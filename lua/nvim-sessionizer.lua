@@ -111,12 +111,22 @@ function M.remove_session()
 	vim.ui.select(M.sessions, { prompt = "Select a session to remove:" }, function(choice)
 		if choice then
 			local socket = sessions_dir .. "/" .. choice
-			vim.fn.delete(socket)
-			vim.notify("Session removed: " .. choice)
-			M.update_sessions()
+			if vim.fn.filereadable(socket) == 1 or vim.fn.getftype(socket) == "socket" then
+				-- Envia comando para fechar Neovim
+				vim.cmd(string.format("silent! call server2client('%s', 'qa!')", socket))
+				-- Dá um tempo para o processo fechar antes de remover
+				vim.defer_fn(function()
+					vim.fn.delete(socket)
+					vim.notify("Session removed: " .. choice)
+					M.update_sessions()
+				end, 200)
+			else
+				vim.notify("Socket not found: " .. socket, vim.log.levels.WARN)
+			end
 		end
 	end)
 end
+
 
 function M.get_sessions()
 	M.update_sessions()
