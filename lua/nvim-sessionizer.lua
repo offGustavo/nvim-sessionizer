@@ -1,3 +1,5 @@
+local picker = require("common.pickers")
+
 local M = {}
 
 local sessions_dir = vim.fn.expand("/tmp/nvim-sessions/")
@@ -92,7 +94,7 @@ function M.attach_session(arg)
 		vim.notify("Connected to session: " .. next_session .. " (index " .. new_index .. ")")
 		M.current_index = new_index
 	else
-		vim.ui.select(M.sessions, { prompt = "Select a session to connect:" }, function(choice)
+	picker.select_item(M.sessions, { prompt = "Select a session to connect:" }, function(choice)
 			if choice then
 				local socket = sessions_dir .. "/" .. choice
         -- vim.cmd("silent! disconnect")
@@ -111,7 +113,7 @@ function M.remove_session()
 		return
 	end
 
-	vim.ui.select(M.sessions, { prompt = "Select a session to remove:" }, function(choice)
+picker.select_item(M.sessions, { prompt = "Select a session to remove:" }, function(choice)
 		if choice then
 			local socket = sessions_dir .. "/" .. choice
 			if vim.fn.filereadable(socket) == 1 or vim.fn.getftype(socket) == "socket" then
@@ -171,7 +173,7 @@ local function select_project(callback)
 		end
 
 		if #items > 0 then
-			vim.ui.select(items, {
+		picker.select_item(items, {
 				prompt = "Select a project:",
 				format_item = function(item)
 					return item.display
@@ -231,7 +233,7 @@ local function select_project(callback)
 		table.insert(items, { path = path, display = path })
 	end
 
-	vim.ui.select(items, {
+picker.select_item(items, {
 		prompt = "Select a project:",
 		format_item = function(item)
 			return item.display
