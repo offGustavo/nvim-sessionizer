@@ -7,9 +7,9 @@ M.sessions = {}
 M.current_index = nil
 
 local config = {
-	no_zoxide = false,
-	search_dirs = { "~/projects", "~/work" }, 
-  max_depth = 3,
+    no_zoxide = false,
+    search_dirs = { "~/projects", "~/work" },
+    max_depth = 3,
 }
 
 local function command_exists(cmd)
@@ -20,7 +20,7 @@ local function list_sessions()
 	return vim.fn.globpath(sessions_dir, "*", false, true)
 end
 
-function M.update_sessions()
+local function update_sessions()
 	local sessions = list_sessions()
 	M.sessions = {}
 	for _, path in ipairs(sessions) do
@@ -48,16 +48,17 @@ function M.new_session()
 			local cmd = { "nohup", "nvim", "--listen", socket, ">/dev/null", "2>&1", "&" }
 			vim.fn.jobstart(table.concat(cmd, " "), { detach = true })
 			vim.defer_fn(function()
+        -- vim.cmd("silent! disconnect")
 				vim.cmd("connect " .. socket)
 				vim.notify("Session created and connected: " .. name)
-				M.update_sessions()
+				update_sessions()
 			end, 300)
 		end
 	end)
 end
 
 function M.attach_session(arg)
-	M.update_sessions()
+	update_sessions()
 	if #M.sessions == 0 then
 		vim.notify("No sessions found", vim.log.levels.WARN)
 		return
@@ -86,6 +87,7 @@ function M.attach_session(arg)
 
 		local next_session = M.sessions[new_index]
 		local socket = sessions_dir .. "/" .. next_session
+    -- vim.cmd("silent! disconnect")
 		vim.cmd("connect " .. socket)
 		vim.notify("Connected to session: " .. next_session .. " (index " .. new_index .. ")")
 		M.current_index = new_index
@@ -93,16 +95,17 @@ function M.attach_session(arg)
 		vim.ui.select(M.sessions, { prompt = "Select a session to connect:" }, function(choice)
 			if choice then
 				local socket = sessions_dir .. "/" .. choice
+        -- vim.cmd("silent! disconnect")
 				vim.cmd("connect " .. socket)
 				vim.notify("Connected to session: " .. choice)
-				M.update_sessions()
+				update_sessions()
 			end
 		end)
 	end
 end
 
 function M.remove_session()
-	M.update_sessions()
+	update_sessions()
 	if #M.sessions == 0 then
 		vim.notify("No sessions to remove", vim.log.levels.WARN)
 		return
@@ -119,7 +122,7 @@ function M.remove_session()
 end
 
 function M.get_sessions()
-	M.update_sessions()
+	update_sessions()
 	if #M.sessions == 0 then
 		vim.notify("No active sessions", vim.log.levels.INFO)
 	else
@@ -139,8 +142,9 @@ end
 local function select_project(callback)
 	local results = {}
 
+	-- Se zoxide está disponível e não está desabilitado
 	if not config.no_zoxide and command_exists("zoxide") then
-		results = vim.fn.systemlist("zoxide query -l -s")
+		results = vim.fn.systemlist("zoxide query -l -s", nil, true)
 		if #results == 0 then
 			vim.notify("No directories found by zoxide", vim.log.levels.WARN)
 		end
@@ -173,9 +177,7 @@ local function select_project(callback)
 		end
 	end
 
-	local cmd = nil
 	local existing_dirs = {}
-
 	for _, dir in ipairs(config.search_dirs or {}) do
 		local expanded = vim.fn.expand(dir)
 		if vim.fn.isdirectory(expanded) == 1 then
@@ -188,20 +190,27 @@ local function select_project(callback)
 		return
 	end
 
-	if command_exists("fd") then
-		cmd = string.format("fd --type d --max-depth %d '' %s",
-			config.max_depth or 3,
-			table.concat(existing_dirs, " "))
-	elseif command_exists("find") then
+	local cmd = nil
+	--TODO: fix fd command
+	-- if command_exists("fd") then
+	-- 	cmd = string.format("fd --type d --color=never --max-depth %d '' %s",
+	-- 		config.max_depth or 3,
+	-- 		table.concat(existing_dirs, " "))
+	if command_exists("find") then
 		cmd = string.format("find %s -mindepth 1 -maxdepth %d -type d",
 			table.concat(existing_dirs, " "),
-			config.find_max_depth or 3)
+			config.max_depth or 3)
 	else
 		vim.notify("Neither zoxide, fd, nor find are available", vim.log.levels.ERROR)
 		return
 	end
 
-	results = vim.fn.systemlist(cmd)
+	results = vim.fn.systemlist(cmd, nil, true)
+	if vim.v.shell_error ~= 0 then
+		vim.notify("Command failed: " .. cmd, vim.log.levels.ERROR)
+		return
+	end
+
 	if #results == 0 then
 		vim.notify("No directories found", vim.log.levels.WARN)
 		return
@@ -209,10 +218,7 @@ local function select_project(callback)
 
 	local items = {}
 	for _, path in ipairs(results) do
-		table.insert(items, {
-			path = path,
-			display = path,
-		})
+		table.insert(items, { path = path, display = path })
 	end
 
 	vim.ui.select(items, {
@@ -239,6 +245,7 @@ function M.sessionizer()
 			or vim.fn.isdirectory(socket) == 1
 			or vim.fn.getftype(socket) == "socket"
 		then
+      -- vim.cmd("silent! disconnect")
 			vim.cmd("connect " .. socket)
 			vim.notify("Connected to existing session: " .. session_name)
 		else
@@ -246,9 +253,10 @@ function M.sessionizer()
 			vim.fn.system(cmd)
 
 			vim.defer_fn(function()
+        -- vim.cmd("silent! disconnect")
 				vim.cmd("connect " .. socket)
 				vim.notify("New session: " .. session_name)
-				M.update_sessions()
+				update_sessions()
 			end, 500)
 		end
 	end)
