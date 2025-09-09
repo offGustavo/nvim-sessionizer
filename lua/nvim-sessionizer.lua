@@ -50,7 +50,6 @@ function M.new_session()
 			local cmd = { "nohup", "nvim", "--listen", socket, ">/dev/null", "2>&1", "&" }
 			vim.fn.jobstart(table.concat(cmd, " "), { detach = true })
 			vim.defer_fn(function()
-        -- vim.cmd("silent! disconnect")
 				vim.cmd("connect " .. socket)
 				vim.notify("Session created and connected: " .. name)
 				update_sessions()
@@ -89,7 +88,6 @@ function M.attach_session(arg)
 
 		local next_session = M.sessions[new_index]
 		local socket = sessions_dir .. "/" .. next_session
-    -- vim.cmd("silent! disconnect")
 		vim.cmd("connect " .. socket)
 		vim.notify("Connected to session: " .. next_session .. " (index " .. new_index .. ")")
 		M.current_index = new_index
@@ -97,7 +95,6 @@ function M.attach_session(arg)
 	picker.select_item(M.sessions, { prompt = "Select a session to connect:" }, function(choice)
 			if choice then
 				local socket = sessions_dir .. "/" .. choice
-        -- vim.cmd("silent! disconnect")
 				vim.cmd("connect " .. socket)
 				vim.notify("Connected to session: " .. choice)
 				update_sessions()
@@ -257,7 +254,6 @@ function M.sessionizer()
 			or vim.fn.isdirectory(socket) == 1
 			or vim.fn.getftype(socket) == "socket"
 		then
-      -- vim.cmd("silent! disconnect")
 			vim.cmd("connect " .. socket)
 			vim.notify("Connected to existing session: " .. session_name)
 		else
@@ -265,7 +261,6 @@ function M.sessionizer()
 			vim.fn.system(cmd)
 
 			vim.defer_fn(function()
-        -- vim.cmd("silent! disconnect")
 				vim.cmd("connect " .. socket)
 				vim.notify("New session: " .. session_name)
 				update_sessions()
