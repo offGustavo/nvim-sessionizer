@@ -54,7 +54,6 @@ local function update_sessions()
 	end
 end
 
-
 --- Select an item from a list using Telescope, fzf-lua, or fallback to vim.ui.select.
 ---@param items table List of items to choose from.
 ---@param opts table Options for the picker. Accepts:
@@ -257,6 +256,8 @@ local function select_project(callback)
 	end)
 end
 
+--- Create a new session in the current working directory.
+--- Prompts the user for a session name, then calls `create_session`.
 function M.new_session()
 	vim.ui.input({ prompt = "Session name:" }, function(name)
 		local path = vim.uv.cwd() .. ""
@@ -264,6 +265,13 @@ function M.new_session()
 	end)
 end
 
+--- Attach to an existing session.
+--- If `arg` is:
+---   - `+1`: attach to the next session in the list
+---   - `-1`: attach to the previous session
+---   - a number: attach to the session at that index
+--- Otherwise, shows a session picker for manual selection.
+---@param arg string|nil Session selector (`+1`, `-1`, index number, or nil for manual choice).
 function M.attach_session(arg)
 	update_sessions()
 	if #M.sessions == 0 then
@@ -286,6 +294,7 @@ function M.attach_session(arg)
 			new_index = tonumber(arg)
 		end
 
+		-- Wrap around if index goes out of range
 		if new_index < 1 then
 			new_index = #M.sessions
 		elseif new_index > #M.sessions then
@@ -298,6 +307,7 @@ function M.attach_session(arg)
 		vim.notify("Connected to session: " .. next_session .. " (index " .. new_index .. ")")
 		M.current_index = new_index
 	else
+		-- Show session picker if no index or relative argument provided
 		select_item(M.sessions, { prompt = "Select a session to connect:" }, function(choice)
 			if choice then
 				local socket = sessions_dir .. "/" .. choice
