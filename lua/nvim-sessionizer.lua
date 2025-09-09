@@ -1,4 +1,5 @@
 local picker = require("common.pickers")
+local session = require("common.sessions")
 
 local M = {}
 
@@ -45,16 +46,8 @@ end
 
 function M.new_session()
 	vim.ui.input({ prompt = "Session name:" }, function(name)
-		if name and name ~= "" then
-			local socket = sessions_dir .. "/" .. name
-			local cmd = { "nohup", "nvim", "--listen", socket, ">/dev/null", "2>&1", "&" }
-			vim.fn.jobstart(table.concat(cmd, " "), { detach = true })
-			vim.defer_fn(function()
-				vim.cmd("connect " .. socket)
-				vim.notify("Session created and connected: " .. name)
-				update_sessions()
-			end, 300)
-		end
+    local path = vim.uv.cwd() .. ""
+    session.create_session(path, name)
 	end)
 end
 
@@ -245,26 +238,19 @@ picker.select_item(items, {
 end
 
 function M.sessionizer()
-	select_project(function(selected_path)
-		local session_name = vim.fn.fnamemodify(selected_path, ":t"):gsub("%.", "_")
-		local socket = sessions_dir .. "/" .. session_name
-
+	select_project(function(path)
+		local name = vim.fn.fnamemodify(path, ":t"):gsub("%.", "_")
+		local socket = sessions_dir .. "/" .. name
 		if
 			vim.fn.filereadable(socket) == 1
 			or vim.fn.isdirectory(socket) == 1
 			or vim.fn.getftype(socket) == "socket"
 		then
+      --TODO: change it to M.attach_session()
 			vim.cmd("connect " .. socket)
-			vim.notify("Connected to existing session: " .. session_name)
+			vim.notify("Connected to existing session: " .. name)
 		else
-			local cmd = string.format('nohup nvim --listen "%s" -c "cd %s" >/dev/null 2>&1 &', socket, selected_path)
-			vim.fn.system(cmd)
-
-			vim.defer_fn(function()
-				vim.cmd("connect " .. socket)
-				vim.notify("New session: " .. session_name)
-				update_sessions()
-			end, 500)
+      session.create_session(path, name)
 		end
 	end)
 end
