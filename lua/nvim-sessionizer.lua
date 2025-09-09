@@ -156,10 +156,14 @@ local function create_session(path, name)
 	end, 500)
 end
 
+--- Select a project directory using zoxide, find, or configured search paths,
+--- and call the provided callback with the selected path.
+---@param callback fun(path:string) Function to call with the selected project path.
+---@return nil
 local function select_project(callback)
 	local results = {}
 
-	-- Se zoxide está disponível e não está desabilitado
+	-- 1. Try zoxide if available and not disabled
 	if not config.no_zoxide and command_exists("zoxide") then
 		results = vim.fn.systemlist("zoxide query -l -s", nil, true)
 		if #results == 0 then
@@ -194,6 +198,7 @@ local function select_project(callback)
 		end
 	end
 
+	-- 2. Collect existing search directories from config
 	local existing_dirs = {}
 	for _, dir in ipairs(config.search_dirs or {}) do
 		local expanded = vim.fn.expand(dir)
@@ -207,12 +212,8 @@ local function select_project(callback)
 		return
 	end
 
+	-- 3. Build search command using `find` (TODO: fix fd command support)
 	local cmd = nil
-	--TODO: fix fd command
-	-- if command_exists("fd") then
-	-- 	cmd = string.format("fd --type d --color=never --max-depth %d '' %s",
-	-- 		config.max_depth or 3,
-	-- 		table.concat(existing_dirs, " "))
 	if command_exists("find") then
 		cmd = string.format(
 			"find %s -mindepth 1 -maxdepth %d -type d",
@@ -235,11 +236,13 @@ local function select_project(callback)
 		return
 	end
 
+	-- 4. Prepare items for selection
 	local items = {}
 	for _, path in ipairs(results) do
 		table.insert(items, { path = path, display = path })
 	end
 
+	-- 5. Use select_item to show picker
 	select_item(items, {
 		prompt = "Select a project:",
 		format_item = function(item)
