@@ -1,5 +1,5 @@
-local picker = require("common.pickers")
-local session = require("common.sessions")
+local picker = require("common.picker")
+local session = require("common.session")
 
 local M = {}
 
