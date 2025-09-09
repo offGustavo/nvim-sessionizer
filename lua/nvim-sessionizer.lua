@@ -21,7 +21,7 @@ end
 
 --- List all available sessions in the sessions directory.
 ---@return string[] A list of session file paths.
-local function list_sessions()
+local function get_sessions()
 	return vim.fn.globpath(sessions_dir, "*", false, true)
 end
 
@@ -33,7 +33,7 @@ end
 
 --- Update the session list and set the current index.
 local function update_sessions()
-	local sessions = list_sessions()
+	local sessions = get_sessions()
 	M.sessions = {}
 	for _, path in ipairs(sessions) do
 		table.insert(M.sessions, vim.fn.fnamemodify(path, ":t"))
@@ -271,7 +271,7 @@ end
 ---   - `-1`: attach to the previous session
 ---   - a number: attach to the session at that index
 --- Otherwise, shows a session picker for manual selection.
----@param arg string|nil Session selector (`+1`, `-1`, index number, or nil for manual choice).
+---@param arg string|number|nil Session selector (`+1`, `-1`, index number, or nil for manual choice).
 function M.attach_session(arg)
 	update_sessions()
 	if #M.sessions == 0 then
@@ -319,30 +319,78 @@ function M.attach_session(arg)
 	end
 end
 
-function M.remove_session()
+--- Remove a session by ID, name, or path.
+--- If no arguments are provided, a popup will appear to select the session to delete.
+---@param id? number  # Optional session index
+---@param name? string  # Optional session name
+---@return nil
+function M.remove_session(id, name)
 	update_sessions()
 	if #M.sessions == 0 then
 		vim.notify("No sessions to remove", vim.log.levels.WARN)
 		return
 	end
 
-	select_item(M.sessions, { prompt = "Select a session to remove:" }, function(choice)
-		if choice then
-			local socket = sessions_dir .. "/" .. choice
-			if vim.fn.filereadable(socket) == 1 or vim.fn.getftype(socket) == "socket" then
-				-- Envia comando para fechar Neovim
-				vim.cmd(string.format("silent! call server2client('%s', 'qa!')", socket))
-				-- Dá um tempo para o processo fechar antes de remover
-				vim.defer_fn(function()
-					vim.fn.delete(socket)
-					vim.notify("Session removed: " .. choice)
-					M.update_sessions()
-				end, 200)
+	-- If ID or name is provided, try to find and remove the specific session
+	if id or name then
+		local target_session
+		
+		if id then
+			-- Find session by index (ID)
+			if id >= 1 and id <= #M.sessions then
+				target_session = M.sessions[id]
 			else
-				vim.notify("Socket not found: " .. socket, vim.log.levels.WARN)
+				vim.notify("Invalid session ID: " .. id, vim.log.levels.ERROR)
+				return
+			end
+		elseif name then
+			-- Find session by name
+			for _, session in ipairs(M.sessions) do
+				if session == name then
+					target_session = session
+					break
+				end
+			end
+			if not target_session then
+				vim.notify("Session not found: " .. name, vim.log.levels.ERROR)
+				return
 			end
 		end
-	end)
+
+		-- Remove the found session
+		local socket = sessions_dir .. "/" .. target_session
+		if vim.fn.filereadable(socket) == 1 or vim.fn.getftype(socket) == "socket" then
+			-- Send command to close Neovim
+			vim.cmd(string.format("silent! call server2client('%s', 'qa!')", socket))
+			-- Give time for the process to close before removing
+			vim.defer_fn(function()
+				vim.fn.delete(socket)
+				vim.notify("Session removed: " .. target_session)
+				M.update_sessions()
+			end, 200)
+		else
+			vim.notify("Socket not found: " .. socket, vim.log.levels.WARN)
+		end
+	else
+		-- No arguments provided, show selection popup
+		select_item(M.sessions, { prompt = "Select a session to remove:" }, function(choice)
+			if choice then
+				local socket = sessions_dir .. "/" .. choice
+				if vim.fn.filereadable(socket) == 1 or vim.fn.getftype(socket) == "socket" then
+					-- Send command to close Neovim
+					vim.cmd(string.format("silent! call server2client('%s', 'qa!')", socket))
+					-- Give time for the process to close before removing
+					vim.defer_fn(function()
+						vim.fn.delete(socket)
+						vim.notify("Session removed: " .. choice)
+						M.update_sessions()
+					end, 200)
+				else
+					vim.notify("Socket not found: " .. socket, vim.log.levels.WARN)
+				end
+			end
+		end)
+	end
 end
 
 function M.get_sessions()
@@ -359,6 +407,9 @@ function M.get_sessions()
 	end
 end
 
+--- Create a new session or attach to an existing one by selecting a project path
+--- Uses a fuzzy finder or vim.ui.select() to choose from available projects
+---@return nil
 function M.sessionizer()
 	select_project(function(path)
 		local name = vim.fn.fnamemodify(path, ":t"):gsub("%.", "_")
@@ -377,6 +428,14 @@ function M.sessionizer()
 	end)
 end
 
+---Configuration table for Sessionizer
+---@class SessionizerConfig
+---@field no_zoxide boolean Whether to disable zoxide integration
+---@field search_dirs string[] Directories to search for projects
+---@field max_depth number Maximum depth to search for projects
+
+---Setup function for Sessionizer
+---@param user_config? SessionizerConfig User configuration to override defaults
 function M.setup(user_config)
 	config = vim.tbl_extend("force", config, user_config or {})
 	vim.api.nvim_create_user_command("Sessionizer", function(opts)

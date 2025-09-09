@@ -82,7 +82,6 @@ require("nvim-sessionizer").setup({
         require("nvim-sessionizer").attach_session(i)
       end, { silent = true, desc = "Go to " .. i .. "session" })
     end
-
   end,
 }
 ```
