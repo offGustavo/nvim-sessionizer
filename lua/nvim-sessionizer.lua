@@ -54,85 +54,6 @@ local function update_sessions()
 	end
 end
 
---- Select an item from a list using Telescope, fzf-lua, or fallback to vim.ui.select.
----@param items table List of items to choose from.
----@param opts table Options for the picker. Accepts:
----  - prompt: string (optional) Custom prompt text.
----  - format_item: fun(item:any):string (optional) Function to format display text.
----@param callback fun(item:any) Function called with the selected item.
-local function select_item(items, opts, callback)
-	-- 1. Try Telescope
-	local has_telescope, telescope = pcall(require, "telescope")
-	if has_telescope then
-		local pickers = require("telescope.pickers")
-		local finders = require("telescope.finders")
-		local conf = require("telescope.config").values
-		local actions = require("telescope.actions")
-		local action_state = require("telescope.actions.state")
-
-		pickers
-			.new({}, {
-				prompt_title = opts.prompt or "Select Item",
-				finder = finders.new_table({
-					results = items,
-					entry_maker = function(entry)
-						return {
-							value = entry,
-							display = opts.format_item and opts.format_item(entry) or tostring(entry),
-							ordinal = opts.format_item and opts.format_item(entry) or tostring(entry),
-						}
-					end,
-				}),
-				sorter = conf.generic_sorter({}),
-				attach_mappings = function(_, map)
-					map("i", "<CR>", function(bufnr)
-						local selection = action_state.get_selected_entry()
-						actions.close(bufnr)
-						if selection then
-							callback(selection.value)
-						end
-					end)
-					return true
-				end,
-			})
-			:find()
-		return
-	end
-
-	-- 2. Try fzf-lua
-	local has_fzf, fzf = pcall(require, "fzf-lua")
-	if has_fzf then
-		fzf.fzf_exec(
-			vim.tbl_map(function(entry)
-				return opts.format_item and opts.format_item(entry) or tostring(entry)
-			end, items),
-			{
-				prompt = opts.prompt or "Select Item> ",
-				actions = {
-					["default"] = function(selected)
-						local idx = nil
-						for i, entry in ipairs(items) do
-							if (opts.format_item and opts.format_item(entry) or tostring(entry)) == selected[1] then
-								idx = i
-								break
-							end
-						end
-						if idx then
-							callback(items[idx])
-						end
-					end,
-				},
-			}
-		)
-		return
-	end
-
-	--TODO: 3. Try snacks.picker
-
-	-- 4. Fallback to vim.ui.select
-	vim.ui.select(items, opts, callback)
-end
-
 --- Create a new Neovim session and connect to it.
 ---@param path string The path where the session will be started.
 ---@param name? string Optional session name. If not provided, it defaults to the last directory name in `path`.
@@ -181,7 +102,7 @@ local function select_project(callback)
 		end
 
 		if #items > 0 then
-			select_item(items, {
+			vim.ui.select(items, {
 				prompt = "Select a project:",
 				format_item = function(item)
 					return item.display
@@ -241,8 +162,8 @@ local function select_project(callback)
 		table.insert(items, { path = path, display = path })
 	end
 
-	-- 5. Use select_item to show picker
-	select_item(items, {
+	-- 5. Use vim.ui.select to show picker
+	vim.ui.select(items, {
 		prompt = "Select a project:",
 		format_item = function(item)
 			return item.display
@@ -308,7 +229,7 @@ function M.attach_session(arg)
 		M.current_index = new_index
 	else
 		-- Show session picker if no index or relative argument provided
-		select_item(M.sessions, { prompt = "Select a session to connect:" }, function(choice)
+		vim.ui.select(M.sessions, { prompt = "Select a session to connect:" }, function(choice)
 			if choice then
 				local socket = sessions_dir .. "/" .. choice
 				vim.cmd("connect " .. socket)
@@ -373,7 +294,7 @@ function M.remove_session(id, name)
 		end
 	else
 		-- No arguments provided, show selection popup
-		select_item(M.sessions, { prompt = "Select a session to remove:" }, function(choice)
+		vim.ui.select(M.sessions, { prompt = "Select a session to remove:" }, function(choice)
 			if choice then
 				local socket = sessions_dir .. "/" .. choice
 				if vim.fn.filereadable(socket) == 1 or vim.fn.getftype(socket) == "socket" then
@@ -408,7 +329,7 @@ function M.get_sessions()
 end
 
 --- Create a new session or attach to an existing one by selecting a project path
---- Uses a fuzzy finder or vim.ui.select() to choose from available projects
+--- Uses vim.ui.select() to choose from available projects
 ---@return nil
 function M.sessionizer()
 	select_project(function(path)
