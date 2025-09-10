@@ -167,6 +167,7 @@ local function select_project(callback)
 		table.insert(items, { path = path, display = path })
 	end
 
+  --TODO: move this to the sessionizer fucntion
 	-- 5. Use vim.ui.select to show picker
 	vim.ui.select(items, {
 		prompt = "Select a project:",
@@ -319,18 +320,21 @@ function M.remove_session(id, name)
 	end
 end
 
+--- List all sessions 
 function M.get_sessions()
-	update_sessions()
-	if #M.sessions == 0 then
-		vim.notify("No active sessions", vim.log.levels.INFO)
-	else
-		local formatted = {}
-		for i, name in ipairs(M.sessions) do
-			local mark = (i == M.current_index) and "(*)" or "   "
-			table.insert(formatted, string.format("%s %d:%s", mark, i, name))
-		end
-		vim.notify("Sessions:\n" .. table.concat(formatted, "\n"))
-	end
+  --TODO: Refazer isso para ser um buffer interativo,
+  --que irá mostrar todas as sessões e permitir que o usuário remova elas
+  update_sessions()
+  if #M.sessions == 0 then
+    vim.notify("No active sessions", vim.log.levels.INFO)
+  else
+    local formatted = {}
+    for i, name in ipairs(M.sessions) do
+      local mark = (i == M.current_index) and "(*)" or "   "
+      table.insert(formatted, string.format("%s %d:%s", mark, i, name))
+    end
+    vim.notify("Sessions:\n" .. table.concat(formatted, "\n"))
+  end
 end
 
 --- Create a new session or attach to an existing one by selecting a project path
