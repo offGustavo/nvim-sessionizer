@@ -260,7 +260,7 @@ function M.remove_session(id, name)
 	-- If ID or name is provided, try to find and remove the specific session
 	if id or name then
 		local target_session
-		
+
 		if id then
 			-- Find session by index (ID)
 			if id >= 1 and id <= #M.sessions then
@@ -371,7 +371,20 @@ function M.setup(user_config)
 		elseif not sub then
 			M.sessionizer()
 		end
-	end, { nargs = "*" })
+	end, {
+		nargs = "*",
+		complete = function(_, line)
+			local words = vim.split(line, "%s+")
+			local n = #words
+			if n == 2 then
+				return { "new", "attach", "remove", "list" }
+			elseif n == 3 and words[2] == "attach" then
+				M.update_sessions()
+				return M.sessions or {}
+			end
+			return {}
+		end,
+	})
 end
 
 return M
