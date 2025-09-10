@@ -198,7 +198,7 @@ end
 ---   - `-1`: attach to the previous session
 ---   - a number: attach to the session at that index
 --- Otherwise, shows a session picker for manual selection.
----@param arg string|number|nil Session selector (`+1`, `-1`, index number, or nil for manual choice).
+---@param arg? string|number|nil Session selector (`+1`, `-1`, index number, or nil for manual choice).
 function M.attach_session(arg)
 	update_sessions()
 	if #M.sessions == 0 then
