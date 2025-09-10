@@ -6,6 +6,11 @@ vim.fn.mkdir(sessions_dir, "p")
 M.sessions = {}
 M.current_index = nil
 
+---Configuration table for Sessionizer
+---@class SessionizerConfig
+---@field no_zoxide boolean Whether to disable zoxide integration
+---@field search_dirs string[] Directories to search for projects
+---@field max_depth number Maximum depth to search for projects
 local config = {
 	no_zoxide = false,
 	search_dirs = { "~/projects", "~/work" },
@@ -348,12 +353,6 @@ function M.sessionizer()
 		end
 	end)
 end
-
----Configuration table for Sessionizer
----@class SessionizerConfig
----@field no_zoxide boolean Whether to disable zoxide integration
----@field search_dirs string[] Directories to search for projects
----@field max_depth number Maximum depth to search for projects
 
 ---Setup function for Sessionizer
 ---@param user_config? SessionizerConfig User configuration to override defaults
