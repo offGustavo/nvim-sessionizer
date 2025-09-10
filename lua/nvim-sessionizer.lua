@@ -24,12 +24,6 @@ local function command_exists(cmd)
 	return vim.fn.executable(cmd) == 1
 end
 
---- List all available sessions in the sessions directory.
----@return string[] A list of session file paths.
-local function get_sessions()
-	return vim.fn.globpath(sessions_dir, "*", false, true)
-end
-
 --- Return the current session name.
 ---@return string The current session name.
 function M.get_current_session()
@@ -38,7 +32,7 @@ end
 
 --- Update the session list and set the current index.
 local function update_sessions()
-	local sessions = get_sessions()
+	local sessions = vim.fn.globpath(sessions_dir, "*", false, true)
 	M.sessions = {}
 	for _, path in ipairs(sessions) do
 		table.insert(M.sessions, vim.fn.fnamemodify(path, ":t"))
@@ -320,7 +314,7 @@ function M.remove_session(id, name)
 	end
 end
 
---- List all sessions 
+--- List all available sessions in the sessions directory.
 function M.get_sessions()
   --TODO: Refazer isso para ser um buffer interativo,
   --que irá mostrar todas as sessões e permitir que o usuário remova elas
