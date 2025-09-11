@@ -74,7 +74,7 @@ require("nvim-sessionizer").setup({
       require("nvim-sessionizer").remove_session()
     end, { silent = true })
     vim.keymap.set("n", "<A-s>", function()
-      require("nvim-sessionizer").get_sessions()
+      require("nvim-sessionizer").manage_sessions()
     end, { silent = true, desc = "List sessions" })
     vim.keymap.set("n", "<A-d>", ":detach<CR>", { silent = true, desc = "Detach current session" })
     for i = 1, 9, 1 do
