@@ -15,6 +15,40 @@ local config = {
 	no_zoxide = false,
 	search_dirs = { "~/projects", "~/work" },
 	max_depth = 3,
+	ui = {
+		keymap = {
+			quit = "q",
+			attach = "<CR>",
+			delete = "D",
+		},
+		win = {
+			width = 0.6,
+			height = 0.4,
+			winbar = {
+				hl_left = "Title", -- highlight group para a parte esquerda
+				hl_right = "Comment", -- highlight group para a parte direita
+				hl_separator = "Comment", -- highlight group para a parte direita
+				sep_left = "/", -- separador entre ações
+				sep_mid = "%=", -- separador para alinhar
+				sep_right = "│",
+				format = function(config) -- agora recebe o config
+					return {
+						left = {
+							config.ui.keymap.quit .. " close",
+							config.ui.keymap.delete .. " delete session",
+						},
+						right = {
+							config.ui.keymap.attach .. " attach session",
+						},
+					}
+				end,
+			},
+		},
+		current = {
+			mark = ">",
+			hl = "MatchParen",
+		},
+	},
 }
 
 --- Verify if a command exists in the system.
@@ -161,7 +195,7 @@ local function select_project(callback)
 		table.insert(items, { path = path, display = path })
 	end
 
-  --TODO: move this to the sessionizer fucntion
+	--TODO: move this to the sessionizer fucntion
 	-- 5. Use vim.ui.select to show picker
 	vim.ui.select(items, {
 		prompt = "Select a project:",
@@ -175,6 +209,29 @@ local function select_project(callback)
 			vim.notify("No project selected", vim.log.levels.WARN)
 		end
 	end)
+end
+
+local function build_winbar()
+	local wb_cfg = config.ui.win.winbar
+	local fmt = wb_cfg.format(config)
+
+	local left = {}
+	for i, txt in ipairs(fmt.left or {}) do
+		table.insert(left, string.format("%%#%s#%s%%*", wb_cfg.hl_left, txt))
+		if i < #fmt.left then
+			table.insert(left, wb_cfg.sep_left)
+		end
+	end
+
+	local right = {}
+	for i, txt in ipairs(fmt.right or {}) do
+		table.insert(right, string.format("%%#%s#%s%%*", wb_cfg.hl_right, txt))
+		if i < #fmt.right then
+			table.insert(right, wb_cfg.sep_right)
+		end
+	end
+
+	return table.concat(left, " ") .. " " .. wb_cfg.sep_mid .. " " .. table.concat(right, " ")
 end
 
 --- Create a new session in the current working directory.
@@ -314,21 +371,108 @@ function M.remove_session(id, name)
 	end
 end
 
---- List all available sessions in the sessions directory.
-function M.get_sessions()
-  --TODO: Refazer isso para ser um buffer interativo,
-  --que irá mostrar todas as sessões e permitir que o usuário remova elas
-  update_sessions()
-  if #M.sessions == 0 then
-    vim.notify("No active sessions", vim.log.levels.INFO)
-  else
-    local formatted = {}
-    for i, name in ipairs(M.sessions) do
-      local mark = (i == M.current_index) and "(*)" or "   "
-      table.insert(formatted, string.format("%s %d:%s", mark, i, name))
-    end
-    vim.notify("Sessions:\n" .. table.concat(formatted, "\n"))
-  end
+--- List all available sessions in an interactive buffer
+---comment
+---@param opts table config
+function M.manage_sessions(opts)
+	opts = opts or {}
+	local width_ratio = opts.width or config.ui.win.width
+	local height_ratio = opts.height or config.ui.win.height
+
+	--TODO: change it to update_sessions return the log...(idk)
+	update_sessions()
+	if #M.sessions == 0 then
+		vim.notify("No active sessions", vim.log.levels.INFO)
+		return
+	end
+
+	local width = math.floor(vim.o.columns * width_ratio)
+	local height = math.floor(vim.o.lines * height_ratio)
+	local row = math.floor((vim.o.lines - height) / 2)
+	local col = math.floor((vim.o.columns - width) / 2)
+
+	local buf = vim.api.nvim_create_buf(false, true)
+	local win = vim.api.nvim_open_win(buf, true, {
+		relative = "editor",
+		width = width,
+		height = height,
+		row = row,
+		col = col,
+		style = "minimal",
+		border = "rounded",
+	})
+	vim.wo[win].winbar = build_winbar()
+
+	-- define o ícone usado na signcolumn
+	vim.fn.sign_define(
+		"SessionMark",
+		{ text = config.ui.current.mark, texthl = config.ui.current.hl, linehl = "", numhl = "" }
+	)
+
+	local function render_sessions()
+		local formatted = {}
+		for i, name in ipairs(M.sessions) do
+			table.insert(formatted, string.format("%d: %s", i, name))
+		end
+
+		vim.bo[buf].modifiable = true
+		vim.api.nvim_buf_set_lines(buf, 0, -1, false, formatted)
+		vim.bo[buf].modifiable = false
+
+		-- limpa signs antigos antes de aplicar de novo
+		vim.fn.sign_unplace("session_marks", { buffer = buf })
+
+		-- aplica mark na linha atual
+		if M.current_index and M.sessions[M.current_index] then
+			vim.fn.sign_place(
+				0, -- id (0 = auto)
+				"session_marks", -- group
+				"SessionMark", -- nome do sign definido
+				buf, -- buffer alvo
+				{ lnum = M.current_index, priority = 10 }
+			)
+		end
+	end
+
+	render_sessions()
+
+	vim.bo[buf].buftype = "nofile"
+	vim.bo[buf].bufhidden = "wipe"
+	vim.bo[buf].swapfile = false
+
+	-- função para remover sessão
+	local function remove_session()
+		local line = vim.fn.line(".")
+		local session = M.sessions[line]
+		if session then
+			M.remove_session(line)
+			vim.defer_fn(function()
+				update_sessions()
+				render_sessions()
+			end, 300)
+		end
+	end
+
+	-- função para fazer attach na sessão
+	local function attach_session()
+		local line = vim.fn.line(".")
+		local session = M.sessions[line]
+		if session then
+			M.attach_session(line) -- precisa estar implementado no seu módulo
+			vim.api.nvim_win_close(win, true)
+		end
+	end
+
+	-- mapear <CR> para attach
+	vim.keymap.set("n", config.ui.keymap.attach, attach_session, { buffer = buf, nowait = true })
+
+	-- mapear D para remover sessão
+	vim.keymap.set("n", config.ui.keymap.delete, remove_session, { buffer = buf, nowait = true })
+
+	-- mapear q para fechar a janela
+	vim.keymap.set("n", config.ui.keymap.quit, function()
+		vim.api.nvim_win_close(win, true)
+	end, { buffer = buf, nowait = true })
 end
 
 --- Create a new session or attach to an existing one by selecting a project path
