@@ -86,6 +86,8 @@ local config = {
 	},
 }
 
+---Save the session order to a file.
+---@return nil
 local function save_session_order()
 	local order_file = sessions_dir .. "/session_order"
 	local lines = {}
@@ -95,6 +97,8 @@ local function save_session_order()
 	vim.fn.writefile(lines, order_file)
 end
 
+---Load the session order from a file.
+---@return nil
 local function load_session_order()
 	local order_file = sessions_dir .. "/session_order"
 	if vim.fn.filereadable(order_file) == 1 then
@@ -105,6 +109,8 @@ local function load_session_order()
 	end
 end
 
+---Apply the saved session order to the current sessions list.
+---@return nil
 local function apply_session_order()
 	if #M.session_order > 0 then
 		local ordered_sessions = {}
@@ -139,7 +145,34 @@ local function apply_session_order()
 	end
 end
 
---- Verify if a command exists in the system.
+---Build a formatted winbar string with highlights and separators.
+---The function processes left and right sections of the winbar configuration,
+---applying highlights to keymaps and using specified separators.
+---@return string # Formatted winbar string ready for vim.wo.winbar
+local function build_winbar()
+	local wb_cfg = config.ui.win.winbar
+	local fmt = wb_cfg.format(config)
+
+	local left = {}
+	for i, txt in ipairs(fmt.left or {}) do
+		table.insert(left, string.format("%%#%s#%s%%*", wb_cfg.hl_left, txt))
+		if i < #fmt.left then
+			table.insert(left, wb_cfg.sep_left)
+		end
+	end
+
+	local right = {}
+	for i, txt in ipairs(fmt.right or {}) do
+		table.insert(right, string.format("%%#%s#%s%%*", wb_cfg.hl_right, txt))
+		if i < #fmt.right then
+			table.insert(right, wb_cfg.sep_right)
+		end
+	end
+
+	return table.concat(left, " ") .. " " .. wb_cfg.sep_mid .. " " .. table.concat(right, " ")
+end
+
+---Verify if a command exists in the system.
 ---@param cmd string Command name to check.
 ---@return boolean True if the command exists, false otherwise.
 local function command_exists(cmd)
@@ -153,6 +186,7 @@ function M.get_current_session()
 end
 
 --- Update the session list and set the current index.
+--- @return nil
 local function update_sessions()
 	local sessions = vim.fn.globpath(sessions_dir, "*", false, true)
 	M.sessions = {}
@@ -303,29 +337,6 @@ local function select_project(callback)
 			vim.notify("No project selected", vim.log.levels.WARN)
 		end
 	end)
-end
-
-local function build_winbar()
-	local wb_cfg = config.ui.win.winbar
-	local fmt = wb_cfg.format(config)
-
-	local left = {}
-	for i, txt in ipairs(fmt.left or {}) do
-		table.insert(left, string.format("%%#%s#%s%%*", wb_cfg.hl_left, txt))
-		if i < #fmt.left then
-			table.insert(left, wb_cfg.sep_left)
-		end
-	end
-
-	local right = {}
-	for i, txt in ipairs(fmt.right or {}) do
-		table.insert(right, string.format("%%#%s#%s%%*", wb_cfg.hl_right, txt))
-		if i < #fmt.right then
-			table.insert(right, wb_cfg.sep_right)
-		end
-	end
-
-	return table.concat(left, " ") .. " " .. wb_cfg.sep_mid .. " " .. table.concat(right, " ")
 end
 
 --- Create a new session in the current working directory.
