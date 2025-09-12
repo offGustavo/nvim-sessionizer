@@ -5,12 +5,44 @@ vim.fn.mkdir(sessions_dir, "p")
 
 M.sessions = {}
 M.current_index = nil
+M.session_order = {} 
 
----Configuration table for Sessionizer
+--- Configuration table for Sessionizer
 ---@class SessionizerConfig
----@field no_zoxide boolean Whether to disable zoxide integration
+---@field no_zoxide boolean Disable zoxide integration
 ---@field search_dirs string[] Directories to search for projects
----@field max_depth number Maximum depth to search for projects
+---@field max_depth integer Maximum depth to search for projects
+---@field ui SessionizerUIConfig? UI configuration
+
+---@class SessionizerUIConfig
+---@field keymap SessionizerKeymapConfig Key mappings for actions
+---@field win SessionizerWinConfig Window configuration
+---@field current SessionizerCurrentConfig Highlight for the current session
+
+---@class SessionizerKeymapConfig
+---@field quit string Key to quit the window
+---@field attach string Key to attach to a session
+---@field delete string Key to delete a session
+---@field move_up string Key to move session up
+---@field move_down string Key to move session down
+
+---@class SessionizerWinConfig
+---@field width number Window width ratio (0-1)
+---@field height number Window height ratio (0-1)
+---@field winbar SessionizerWinbarConfig Winbar configuration
+
+---@class SessionizerWinbarConfig
+---@field hl_left string Highlight group for left section text
+---@field hl_right string Highlight group for right section text
+---@field hl_separator string Highlight group for separators
+---@field sep_left string Separator between left items
+---@field sep_mid string Separator for middle alignment
+---@field sep_right string Separator between right items
+---@field format fun(config:SessionizerConfig):{left:string[], right:string[]} Function that returns formatted winbar items
+
+---@class SessionizerCurrentConfig
+---@field mark string Marker for the current session
+---@field hl string Highlight group for the marker
 local config = {
 	no_zoxide = false,
 	search_dirs = { "~/projects", "~/work" },
@@ -19,7 +51,9 @@ local config = {
 		keymap = {
 			quit = "q",
 			attach = "<CR>",
-			delete = "D",
+			delete = "<S-d>",
+			move_up = "<S-k>",
+			move_down = "<S-j>",
 		},
 		win = {
 			width = 0.6,
@@ -34,11 +68,12 @@ local config = {
 				format = function(config) -- agora recebe o config
 					return {
 						left = {
-							config.ui.keymap.quit .. " close",
+							" " ..config.ui.keymap.quit .. " close",
 							config.ui.keymap.delete .. " delete session",
 						},
 						right = {
 							config.ui.keymap.attach .. " attach session",
+							config.ui.keymap.move_up .. "/" .. config.ui.keymap.move_down .. " move session ",
 						},
 					}
 				end,
@@ -50,6 +85,59 @@ local config = {
 		},
 	},
 }
+
+local function save_session_order()
+	local order_file = sessions_dir .. "/session_order"
+	local lines = {}
+	for _, session_name in ipairs(M.session_order) do
+		table.insert(lines, session_name)
+	end
+	vim.fn.writefile(lines, order_file)
+end
+
+local function load_session_order()
+	local order_file = sessions_dir .. "/session_order"
+	if vim.fn.filereadable(order_file) == 1 then
+		local lines = vim.fn.readfile(order_file)
+		M.session_order = lines
+	else
+		M.session_order = {}
+	end
+end
+
+local function apply_session_order()
+	if #M.session_order > 0 then
+		local ordered_sessions = {}
+		local unordered_sessions = {}
+
+		for _, ordered_name in ipairs(M.session_order) do
+			for _, session_name in ipairs(M.sessions) do
+				if session_name == ordered_name then
+					table.insert(ordered_sessions, session_name)
+					break
+				end
+			end
+		end
+
+		for _, session_name in ipairs(M.sessions) do
+			local found = false
+			for _, ordered_name in ipairs(ordered_sessions) do
+				if session_name == ordered_name then
+					found = true
+					break
+				end
+			end
+			if not found then
+				table.insert(unordered_sessions, session_name)
+			end
+		end
+
+		M.sessions = ordered_sessions
+		for _, session_name in ipairs(unordered_sessions) do
+			table.insert(M.sessions, session_name)
+		end
+	end
+end
 
 --- Verify if a command exists in the system.
 ---@param cmd string Command name to check.
@@ -69,9 +157,15 @@ local function update_sessions()
 	local sessions = vim.fn.globpath(sessions_dir, "*", false, true)
 	M.sessions = {}
 	for _, path in ipairs(sessions) do
-		table.insert(M.sessions, vim.fn.fnamemodify(path, ":t"))
+		local session_name = vim.fn.fnamemodify(path, ":t")
+		-- Ignora o arquivo de ordem das sessões
+		if session_name ~= "session_order" then
+			table.insert(M.sessions, session_name)
+		end
 	end
-	table.sort(M.sessions)
+
+	load_session_order()
+	apply_session_order()
 
 	if #M.sessions == 0 then
 		M.current_index = nil
@@ -165,7 +259,7 @@ local function select_project(callback)
 		return
 	end
 
-	-- 3. Build search command using `find` (TODO: fix fd command support)
+	-- 3. Build search command using `find` (TODO: add fd command support)
 	local cmd = nil
 	if command_exists("find") then
 		cmd = string.format(
@@ -344,7 +438,15 @@ function M.remove_session(id, name)
 			vim.defer_fn(function()
 				vim.fn.delete(socket)
 				vim.notify("Session removed: " .. target_session)
-				M.update_sessions()
+				update_sessions()
+				-- Atualiza a ordem após remover a sessão
+				for i, session_name in ipairs(M.session_order) do
+					if session_name == target_session then
+						table.remove(M.session_order, i)
+						break
+					end
+				end
+				save_session_order()
 			end, 200)
 		else
 			vim.notify("Socket not found: " .. socket, vim.log.levels.WARN)
@@ -361,7 +463,15 @@ function M.remove_session(id, name)
 					vim.defer_fn(function()
 						vim.fn.delete(socket)
 						vim.notify("Session removed: " .. choice)
-						M.update_sessions()
+						update_sessions()
+						-- Atualiza a ordem após remover a sessão
+						for i, session_name in ipairs(M.session_order) do
+							if session_name == choice then
+								table.remove(M.session_order, i)
+								break
+							end
+						end
+						save_session_order()
 					end, 200)
 				else
 					vim.notify("Socket not found: " .. socket, vim.log.levels.WARN)
@@ -371,15 +481,49 @@ function M.remove_session(id, name)
 	end
 end
 
+--- Move a session up in the order
+---@param line number Line number of the session to move
+local function move_session_up(line)
+	if line > 1 then
+		-- Move a sessão na lista
+		local temp = M.sessions[line]
+		M.sessions[line] = M.sessions[line - 1]
+		M.sessions[line - 1] = temp
+
+		-- Atualiza a ordem personalizada
+		M.session_order = vim.deepcopy(M.sessions)
+		save_session_order()
+
+		return true
+	end
+	return false
+end
+
+--- Move a session down in the order
+---@param line number Line number of the session to move
+local function move_session_down(line)
+	if line < #M.sessions then
+		-- Move a sessão na lista
+		local temp = M.sessions[line]
+		M.sessions[line] = M.sessions[line + 1]
+		M.sessions[line + 1] = temp
+
+		-- Atualiza a ordem personalizada
+		M.session_order = vim.deepcopy(M.sessions)
+		save_session_order()
+
+		return true
+	end
+	return false
+end
+
 --- List all available sessions in an interactive buffer
----comment
----@param opts table config
+---@param opts? table config
 function M.manage_sessions(opts)
 	opts = opts or {}
 	local width_ratio = opts.width or config.ui.win.width
 	local height_ratio = opts.height or config.ui.win.height
 
-	--TODO: change it to update_sessions return the log...(idk)
 	update_sessions()
 	if #M.sessions == 0 then
 		vim.notify("No active sessions", vim.log.levels.INFO)
@@ -399,9 +543,12 @@ function M.manage_sessions(opts)
 		row = row,
 		col = col,
 		style = "minimal",
+    title = " Sessionizer ", 
 		border = "rounded",
 	})
 	vim.wo[win].winbar = build_winbar()
+	vim.wo[win].number = true
+	vim.wo[win].cursorline = true
 
 	-- define o ícone usado na signcolumn
 	vim.fn.sign_define(
@@ -412,7 +559,8 @@ function M.manage_sessions(opts)
 	local function render_sessions()
 		local formatted = {}
 		for i, name in ipairs(M.sessions) do
-			table.insert(formatted, string.format("%d: %s", i, name))
+			-- Usa apenas o número da linha para representar a ordem
+			table.insert(formatted, string.format("%s", name))
 		end
 
 		vim.bo[buf].modifiable = true
@@ -458,8 +606,28 @@ function M.manage_sessions(opts)
 		local line = vim.fn.line(".")
 		local session = M.sessions[line]
 		if session then
-			M.attach_session(line) -- precisa estar implementado no seu módulo
+			M.attach_session(line)
 			vim.api.nvim_win_close(win, true)
+		end
+	end
+
+	-- função para mover sessão para cima
+	local function move_up()
+		local line = vim.fn.line(".")
+		if move_session_up(line) then
+			render_sessions()
+			-- Move o cursor para acompanhar a sessão movida
+			vim.api.nvim_win_set_cursor(win, { line - 1, 0 })
+		end
+	end
+
+	-- função para mover sessão para baixo
+	local function move_down()
+		local line = vim.fn.line(".")
+		if move_session_down(line) then
+			render_sessions()
+			-- Move o cursor para acompanhar a sessão movida
+			vim.api.nvim_win_set_cursor(win, { line + 1, 0 })
 		end
 	end
 
@@ -468,6 +636,12 @@ function M.manage_sessions(opts)
 
 	-- mapear D para remover sessão
 	vim.keymap.set("n", config.ui.keymap.delete, remove_session, { buffer = buf, nowait = true })
+
+	-- mapear Shift+Up para mover sessão para cima
+	vim.keymap.set("n", config.ui.keymap.move_up, move_up, { buffer = buf, nowait = true })
+
+	-- mapear Shift+Down para mover sessão para baixo
+	vim.keymap.set("n", config.ui.keymap.move_down, move_down, { buffer = buf, nowait = true })
 
 	-- mapear q para fechar a janela
 	vim.keymap.set("n", config.ui.keymap.quit, function()
@@ -487,7 +661,6 @@ function M.sessionizer()
 			or vim.fn.isdirectory(socket) == 1
 			or vim.fn.getftype(socket) == "socket"
 		then
-			--TODO: change it to M.attach_session()
 			vim.cmd("connect " .. socket)
 			vim.notify("Connected to existing session: " .. name)
 		else
@@ -500,6 +673,10 @@ end
 ---@param user_config? SessionizerConfig User configuration to override defaults
 function M.setup(user_config)
 	config = vim.tbl_extend("force", config, user_config or {})
+
+	-- Carrega a ordem das sessões ao inicializar
+	load_session_order()
+
 	vim.api.nvim_create_user_command("Sessionizer", function(opts)
 		local sub = opts.fargs[1]
 		if sub == "new" then
@@ -509,7 +686,7 @@ function M.setup(user_config)
 		elseif sub == "remove" then
 			M.remove_session()
 		elseif sub == "list" then
-			M.get_sessions()
+			M.manage_sessions()
 		elseif not sub then
 			M.sessionizer()
 		end
@@ -521,7 +698,7 @@ function M.setup(user_config)
 			if n == 2 then
 				return { "new", "attach", "remove", "list" }
 			elseif n == 3 and words[2] == "attach" then
-				M.update_sessions()
+				update_sessions()
 				return M.sessions or {}
 			end
 			return {}
