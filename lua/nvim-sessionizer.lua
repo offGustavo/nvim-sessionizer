@@ -697,7 +697,7 @@ function M.setup(user_config)
 			M.attach_session(opts.fargs[2])
 		elseif sub == "remove" then
 			M.remove_session()
-		elseif sub == "list" then
+		elseif sub == "manage" then
 			M.manage_sessions()
 		elseif not sub then
 			M.sessionizer()
@@ -708,7 +708,7 @@ function M.setup(user_config)
 			local words = vim.split(line, "%s+")
 			local n = #words
 			if n == 2 then
-				return { "new", "attach", "remove", "list" }
+				return { "new", "attach", "remove", "manage" }
 			elseif n == 3 and words[2] == "attach" then
 				update_sessions()
 				return M.sessions or {}
