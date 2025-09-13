@@ -493,28 +493,26 @@ function M.remove_session(id, name)
 	end
 end
 
---- Move a session up in the order
----@param line number Line number of the session to move
-local function move_session_up(line)
-	if line > 1 then
-		-- Move a sessão na lista
-		local temp = M.sessions[line]
-		M.sessions[line] = M.sessions[line - 1]
-		M.sessions[line - 1] = temp
-
-		-- Atualiza a ordem personalizada
-		M.session_order = vim.deepcopy(M.sessions)
-		save_session_order()
-
-		return true
-	end
-	return false
-end
-
---- Move a session down in the order
----@param line number Line number of the session to move
-local function move_session_down(line)
-	if line < #M.sessions then
+--- Reorders the session list by moving a session up or down.
+---
+--- If `up` is true, the session will move one position up.  
+--- Otherwise, it will move one position down.  
+--- The custom order (`M.session_order`) is updated after the move.
+---
+---@param line number The index (1-based) of the session to move.
+---@param up? boolean If true, move the session up; if false or nil, move it down.
+---@return boolean success True if the session was successfully moved, false otherwise.
+---
+---@example
+--- -- Move the second session down
+--- local ok = move_session(2, false)
+--- print(ok) -- true if moved
+---
+--- -- Move the third session up
+--- local ok = move_session(3, true)
+--- print(ok) -- true if moved
+local function move_session(line, up)
+	if line < #M.sessions and not up then
 		-- Move a sessão na lista
 		local temp = M.sessions[line]
 		M.sessions[line] = M.sessions[line + 1]
@@ -526,6 +524,20 @@ local function move_session_down(line)
 
 		return true
 	end
+
+	if line > 1 and up then
+		-- Move a sessão na lista
+		local temp = M.sessions[line]
+		M.sessions[line] = M.sessions[line - 1]
+		M.sessions[line - 1] = temp
+
+		-- Atualiza a ordem personalizada
+		M.session_order = vim.deepcopy(M.sessions)
+		save_session_order()
+
+		return true
+	end
+
 	return false
 end
 
@@ -626,7 +638,7 @@ function M.manage_sessions(opts)
 	-- função para mover sessão para cima
 	local function move_up()
 		local line = vim.fn.line(".")
-		if move_session_up(line) then
+		if move_session(line, true) then
 			render_sessions()
 			-- Move o cursor para acompanhar a sessão movida
 			vim.api.nvim_win_set_cursor(win, { line - 1, 0 })
@@ -636,7 +648,7 @@ function M.manage_sessions(opts)
 	-- função para mover sessão para baixo
 	local function move_down()
 		local line = vim.fn.line(".")
-		if move_session_down(line) then
+		if move_session(line, false) then
 			render_sessions()
 			-- Move o cursor para acompanhar a sessão movida
 			vim.api.nvim_win_set_cursor(win, { line + 1, 0 })
