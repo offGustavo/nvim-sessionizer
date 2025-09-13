@@ -343,6 +343,7 @@ end
 --- Prompts the user for a session name, then calls `create_session`.
 function M.new_session()
 	vim.ui.input({ prompt = "Session name:" }, function(name)
+    if name == nil then return end
 		local path = vim.uv.cwd() .. ""
 		create_session(path, name)
 	end)
