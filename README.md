@@ -9,6 +9,9 @@ It may have breaking changes, so keep this in mind when updating.
 > [!IMPORTANT]
 > You need to use Neovim 0.12, and this is not a proper release. I highly recommend not switching to 0.12 until the official release, you might face some problems or breaking changes
 
+> [!IMPORTANT]
+> **Windows is not currently supported.** This plugin only works on Linux/Unix.
+
 ## Requirements
 
 - Neovim 0.12
