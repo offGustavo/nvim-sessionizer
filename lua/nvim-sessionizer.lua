@@ -257,7 +257,7 @@ local function select_project(callback)
 			if path then
 				table.insert(items, {
 					path = path,
-					display = string.format("%s (%s)", path, score),
+					display = string.format("%s %s", score, path),
 				})
 			end
 		end
