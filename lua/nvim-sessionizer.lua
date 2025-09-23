@@ -100,7 +100,6 @@ else
 	vim.fn.mkdir(sessions_dir, "p")
 end
 
-
 ---Save the session order to a file.
 ---@return nil
 local function save_session_order()
@@ -268,8 +267,9 @@ end
 local function select_project(callback)
 	local results = {}
 
+
 	-- 1. Try zoxide if available and not disabled
-	if not config.no_zoxide and command_exists("zoxide") then
+	if not config.no_zoxide and command_exists("zoxide") and not on_windows() then
 		results = vim.fn.systemlist("zoxide query -l -s", nil, 1)
 		if #results == 0 then
 			vim.notify("No directories found by zoxide", vim.log.levels.WARN)
@@ -319,7 +319,7 @@ local function select_project(callback)
 
 	-- 3. Build search command using `find` (TODO: add fd command support)
 	local cmd = nil
-	if command_exists("find") then
+	if command_exists("find") and not on_windows() then
 		cmd = string.format(
 			"find %s -mindepth 1 -maxdepth %d -type d",
 			table.concat(existing_dirs, " "),
