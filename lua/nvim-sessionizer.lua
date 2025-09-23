@@ -271,6 +271,7 @@ local function select_project(callback)
 	-- 1. Try zoxide if available and not disabled
 	if not config.no_zoxide and command_exists("zoxide") and not on_windows() then
 		results = vim.fn.systemlist("zoxide query -l -s", nil, 1)
+
 		if #results == 0 then
 			vim.notify("No directories found by zoxide", vim.log.levels.WARN)
 		end
@@ -329,8 +330,11 @@ local function select_project(callback)
 		vim.notify("Neither zoxide, fd, nor find are available", vim.log.levels.ERROR)
 		return
 	end
-
-	results = vim.fn.systemlist(cmd, nil, 1)
+  vim.system({cmd}, { text = true }, function(obj)
+    if obj.code == 0 then
+      results = vim.split(obj.stdout, "\n", { trimempty = true })
+    end
+  end)
 	if vim.v.shell_error ~= 0 then
 		vim.notify("Command failed: " .. cmd, vim.log.levels.ERROR)
 		return
