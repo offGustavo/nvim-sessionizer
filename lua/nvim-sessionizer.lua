@@ -1,11 +1,8 @@
 local M = {}
 
-local sessions_dir = vim.fn.expand("/tmp/nvim-sessions/")
-vim.fn.mkdir(sessions_dir, "p")
-
 M.sessions = {}
 M.current_index = nil
-M.session_order = {} 
+M.session_order = {}
 
 --- Configuration table for Sessionizer
 ---@class SessionizerConfig
@@ -68,7 +65,7 @@ local config = {
 				format = function(config) -- agora recebe o config
 					return {
 						left = {
-							" " ..config.ui.keymap.quit .. " close",
+							" " .. config.ui.keymap.quit .. " close",
 							config.ui.keymap.delete .. " delete session",
 						},
 						right = {
@@ -86,6 +83,24 @@ local config = {
 	},
 }
 
+---Verify if the plugin is running on windows
+---@return boolean if the plugin is running on windows, return true
+local function on_windows()
+	return vim.fn.has("win32") == 1
+end
+
+--- Directory for create the session dir
+local sessions_dir = nil
+
+-- Verify if the plugin is running on windows and define the variable `sessions_dir`
+if on_windows() then
+	sessions_dir = "\\\\.\\pipe\\nvim-sessions"
+else
+	sessions_dir = vim.fn.expand("/tmp/nvim-sessions/")
+	vim.fn.mkdir(sessions_dir, "p")
+end
+
+
 ---Save the session order to a file.
 ---@return nil
 local function save_session_order()
@@ -97,8 +112,19 @@ local function save_session_order()
 	vim.fn.writefile(lines, order_file)
 end
 
+---Return the name of socket
+---@param name string
+---@return string
+local function get_socket(name)
+	if on_windows() then
+		return string.format("\\\\.\\pipe\\nvim-%s", name)
+	end
+	return sessions_dir .. "/" .. name
+end
+
 ---Load the session order from a file.
 ---@return nil
+---jj
 local function load_session_order()
 	local order_file = sessions_dir .. "/session_order"
 	if vim.fn.filereadable(order_file) == 1 then
@@ -226,9 +252,7 @@ local function create_session(path, name)
 
 	-- If name isn't provided, use the directory name from path
 	name = name or vim.fn.fnamemodify(path, ":t"):gsub("%.", "_")
-	local socket = sessions_dir .. "/" .. name
-	local cmd = string.format('nohup nvim --listen "%s" -c "cd %s" >/dev/null 2>&1 &', socket, path)
-	vim.fn.system(cmd)
+	local socket = get_socket(name)
 
 	vim.defer_fn(function()
 		vim.cmd("connect " .. socket)
@@ -343,7 +367,9 @@ end
 --- Prompts the user for a session name, then calls `create_session`.
 function M.new_session()
 	vim.ui.input({ prompt = "Session name:" }, function(name)
-    if name == nil then return end
+		if name == nil then
+			return
+		end
 		local path = vim.uv.cwd() .. ""
 		create_session(path, name)
 	end)
@@ -386,7 +412,7 @@ function M.attach_session(arg)
 		end
 
 		local next_session = M.sessions[new_index]
-		local socket = sessions_dir .. "/" .. next_session
+		local socket = get_socket(next_session)
 		vim.cmd("connect " .. socket)
 		vim.notify("Connected to session: " .. next_session .. " (index " .. new_index .. ")")
 		M.current_index = new_index
@@ -394,7 +420,7 @@ function M.attach_session(arg)
 		-- Show session picker if no index or relative argument provided
 		vim.ui.select(M.sessions, { prompt = "Select a session to connect:" }, function(choice)
 			if choice then
-				local socket = sessions_dir .. "/" .. choice
+				local socket = get_socket(choice)
 				vim.cmd("connect " .. socket)
 				vim.notify("Connected to session: " .. choice)
 				update_sessions()
@@ -442,7 +468,7 @@ function M.remove_session(id, name)
 		end
 
 		-- Remove the found session
-		local socket = sessions_dir .. "/" .. target_session
+		local socket = get_socket(target_session)
 		if vim.fn.filereadable(socket) == 1 or vim.fn.getftype(socket) == "socket" then
 			-- Send command to close Neovim
 			vim.cmd(string.format("silent! call server2client('%s', 'qa!')", socket))
@@ -467,7 +493,7 @@ function M.remove_session(id, name)
 		-- No arguments provided, show selection popup
 		vim.ui.select(M.sessions, { prompt = "Select a session to remove:" }, function(choice)
 			if choice then
-				local socket = sessions_dir .. "/" .. choice
+				local socket = get_socket(choice)
 				if vim.fn.filereadable(socket) == 1 or vim.fn.getftype(socket) == "socket" then
 					-- Send command to close Neovim
 					vim.cmd(string.format("silent! call server2client('%s', 'qa!')", socket))
@@ -495,8 +521,8 @@ end
 
 --- Reorders the session list by moving a session up or down.
 ---
---- If `up` is true, the session will move one position up.  
---- Otherwise, it will move one position down.  
+--- If `up` is true, the session will move one position up.
+--- Otherwise, it will move one position down.
 --- The custom order (`M.session_order`) is updated after the move.
 ---
 ---@param line number The index (1-based) of the session to move.
@@ -567,7 +593,7 @@ function M.manage_sessions(opts)
 		row = row,
 		col = col,
 		style = "minimal",
-    title = " Sessionizer ", 
+		title = " Sessionizer ",
 		border = "rounded",
 	})
 	vim.wo[win].winbar = build_winbar()
@@ -679,7 +705,7 @@ end
 function M.sessionizer()
 	select_project(function(path)
 		local name = vim.fn.fnamemodify(path, ":t"):gsub("%.", "_")
-		local socket = sessions_dir .. "/" .. name
+		local socket = get_socket(name)
 		if
 			vim.fn.filereadable(socket) == 1
 			or vim.fn.isdirectory(socket) == 1
