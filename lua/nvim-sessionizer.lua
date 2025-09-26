@@ -5,7 +5,7 @@ vim.fn.mkdir(sessions_dir, "p")
 
 M.sessions = {}
 M.current_index = nil
-M.session_order = {} 
+M.session_order = {}
 
 --- Configuration table for Sessionizer
 ---@class SessionizerConfig
@@ -567,7 +567,7 @@ function M.manage_sessions(opts)
 		row = row,
 		col = col,
 		style = "minimal",
-    title = " Sessionizer ", 
+    title = " Sessionizer ",
 		border = "rounded",
 	})
 	vim.wo[win].winbar = build_winbar()
