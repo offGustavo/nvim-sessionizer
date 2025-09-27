@@ -227,26 +227,44 @@ end
 ---
 ---@param path string The filesystem path where the session will start.
 ---@param name? string Optional session name. Defaults to the last directory name in `path`.
+--- Create (or connect to) a Neovim session.
+---@param path string The filesystem path where the session will start.
+---@param name? string Optional session name.
 local function create_session(path, name)
 	if not path then
 		vim.notify("Path is required!", vim.log.levels.ERROR)
 		return
 	end
 
-	-- Use the last directory name as the default session name
 	name = name or vim.fn.fnamemodify(path, ":t"):gsub("%.", "_")
 	local socket = sessions_dir .. "/" .. name
+	local session_file = sessions_dir .. "/" .. name .. ".vim" -- arquivo de mksession
 
-	-- Check if the session socket already exists
-	if vim.fn.filereadable(socket) == 1 or vim.fn.isdirectory(socket) == 1 or vim.fn.getftype(socket) == "socket" then
+	-- Se o socket já existir, conecta
+	if vim.fn.filereadable(socket) == 1 or vim.fn.getftype(socket) == "socket" then
 		vim.notify("Existing session found. Connecting to '" .. name .. "'...", vim.log.levels.INFO)
 	else
-		-- Start a new Neovim instance listening on this socket
-		local cmd = string.format('nohup nvim --listen "%s" -c "cd %s" >/dev/null 2>&1 &', socket, path)
+		-- Se houver arquivo de sessão salvo, carrega ele
+		local cmd
+		if vim.fn.filereadable(session_file) == 1 then
+			vim.notify("Session file found. Restoring session '" .. name .. "'...", vim.log.levels.INFO)
+			cmd = string.format(
+				'nohup nvim --listen "%s" -S "%s" >/dev/null 2>&1 &',
+				socket,
+				session_file
+			)
+		else
+			-- Caso contrário, apenas abre Neovim no diretório
+			cmd = string.format(
+				'nohup nvim --listen "%s" -c "cd %s" >/dev/null 2>&1 &',
+				socket,
+				path
+			)
+		end
 		vim.fn.system(cmd)
 	end
 
-	-- Attach to the session after a short delay
+	-- Conecta depois de iniciar
 	vim.defer_fn(function()
 		M.attach_session(name)
 	end, 500)
@@ -373,6 +391,9 @@ function M.new_session()
 			name = vim.fn.fnamemodify(path, ":t"):gsub("%.", "_")
 			vim.notify("No session name provided. Using default: " .. name, vim.log.levels.INFO)
 		end
+
+		local session_file = sessions_dir .. "/" .. name .. ".vim"
+		vim.cmd("mksession! " .. vim.fn.fnameescape(session_file))
 
 		create_session(path, name)
 	end)
