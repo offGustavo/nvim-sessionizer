@@ -68,7 +68,7 @@ local config = {
 				format = function(config) -- agora recebe o config
 					return {
 						left = {
-							" " ..config.ui.keymap.quit .. " close",
+							" " .. config.ui.keymap.quit .. " close",
 							config.ui.keymap.delete .. " delete session",
 						},
 						right = {
@@ -215,25 +215,40 @@ local function update_sessions()
 	end
 end
 
---- Create a new Neovim session and connect to it.
----@param path string The path where the session will be started.
----@param name? string Optional session name. If not provided, it defaults to the last directory name in `path`.
+--- Create (or connect to) a Neovim session.
+---
+--- This function will:
+--- 1. Validate the provided path.
+--- 2. Derive a session name if one is not provided.
+--- 3. Check if a socket for this session already exists.
+---    - If it exists, connect to the running session.
+---    - If it doesn't, start a new Neovim instance with the session socket.
+--- 4. Attach the current client to the session.
+---
+---@param path string The filesystem path where the session will start.
+---@param name? string Optional session name. Defaults to the last directory name in `path`.
 local function create_session(path, name)
 	if not path then
 		vim.notify("Path is required!", vim.log.levels.ERROR)
 		return
 	end
 
-	-- If name isn't provided, use the directory name from path
+	-- Use the last directory name as the default session name
 	name = name or vim.fn.fnamemodify(path, ":t"):gsub("%.", "_")
 	local socket = sessions_dir .. "/" .. name
-	local cmd = string.format('nohup nvim --listen "%s" -c "cd %s" >/dev/null 2>&1 &', socket, path)
-	vim.fn.system(cmd)
 
+	-- Check if the session socket already exists
+	if vim.fn.filereadable(socket) == 1 or vim.fn.isdirectory(socket) == 1 or vim.fn.getftype(socket) == "socket" then
+		vim.notify("Existing session found. Connecting to '" .. name .. "'...", vim.log.levels.INFO)
+	else
+		-- Start a new Neovim instance listening on this socket
+		local cmd = string.format('nohup nvim --listen "%s" -c "cd %s" >/dev/null 2>&1 &', socket, path)
+		vim.fn.system(cmd)
+	end
+
+	-- Attach to the session after a short delay
 	vim.defer_fn(function()
-		vim.cmd("connect " .. socket)
-		vim.notify("New session: " .. name)
-		update_sessions()
+		M.attach_session(name)
 	end, 500)
 end
 
@@ -341,10 +356,24 @@ end
 
 --- Create a new session in the current working directory.
 --- Prompts the user for a session name, then calls `create_session`.
+--- If the user presses <Esc>, the operation is canceled.
+--- If the user presses <Enter> without typing a name, a new session will be created
+--- using the current directory name as default.
+---@return nil
 function M.new_session()
-	vim.ui.input({ prompt = "Session name:" }, function(name)
-    if name == nil then return end
+	vim.ui.input({ prompt = "Session name: " }, function(name)
 		local path = vim.uv.cwd() .. ""
+
+		if name == nil then
+			vim.notify("Operation canceled. Session not created.", vim.log.levels.WARN)
+			return
+		end
+
+		if name == "" then
+			name = vim.fn.fnamemodify(path, ":t"):gsub("%.", "_")
+			vim.notify("No session name provided. Using default: " .. name, vim.log.levels.INFO)
+		end
+
 		create_session(path, name)
 	end)
 end
@@ -495,8 +524,8 @@ end
 
 --- Reorders the session list by moving a session up or down.
 ---
---- If `up` is true, the session will move one position up.  
---- Otherwise, it will move one position down.  
+--- If `up` is true, the session will move one position up.
+--- Otherwise, it will move one position down.
 --- The custom order (`M.session_order`) is updated after the move.
 ---
 ---@param line number The index (1-based) of the session to move.
@@ -567,7 +596,7 @@ function M.manage_sessions(opts)
 		row = row,
 		col = col,
 		style = "minimal",
-    title = " Sessionizer ",
+		title = " Sessionizer ",
 		border = "rounded",
 	})
 	vim.wo[win].winbar = build_winbar()
@@ -678,18 +707,7 @@ end
 ---@return nil
 function M.sessionizer()
 	select_project(function(path)
-		local name = vim.fn.fnamemodify(path, ":t"):gsub("%.", "_")
-		local socket = sessions_dir .. "/" .. name
-		if
-			vim.fn.filereadable(socket) == 1
-			or vim.fn.isdirectory(socket) == 1
-			or vim.fn.getftype(socket) == "socket"
-		then
-			vim.cmd("connect " .. socket)
-			vim.notify("Connected to existing session: " .. name)
-		else
-			create_session(path, name)
-		end
+		create_session(path)
 	end)
 end
 
