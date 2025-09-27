@@ -193,7 +193,7 @@ local function update_sessions()
 	for _, path in ipairs(sessions) do
 		local session_name = vim.fn.fnamemodify(path, ":t")
 		-- Ignora o arquivo de ordem das sessões
-		if session_name ~= "session_order" then
+    if session_name ~= "session_order" and not session_name:match("%.vim$") then
 			table.insert(M.sessions, session_name)
 		end
 	end
