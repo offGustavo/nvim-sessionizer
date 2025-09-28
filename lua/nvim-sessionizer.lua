@@ -150,6 +150,7 @@ end
 ---applying highlights to keymaps and using specified separators.
 ---@return string # Formatted winbar string ready for vim.wo.winbar
 local function build_winbar()
+  -- TODO: Simplificar isso
 	local wb_cfg = config.ui.win.winbar
 	local fmt = wb_cfg.format(config)
 
@@ -193,7 +194,7 @@ local function update_sessions()
 	for _, path in ipairs(sessions) do
 		local session_name = vim.fn.fnamemodify(path, ":t")
 		-- Ignora o arquivo de ordem das sessões
-    if session_name ~= "session_order" and not session_name:match("%.vim$") then
+		if session_name ~= "session_order" and not session_name:match("%.vim$") then
 			table.insert(M.sessions, session_name)
 		end
 	end
@@ -227,9 +228,6 @@ end
 ---
 ---@param path string The filesystem path where the session will start.
 ---@param name? string Optional session name. Defaults to the last directory name in `path`.
---- Create (or connect to) a Neovim session.
----@param path string The filesystem path where the session will start.
----@param name? string Optional session name.
 local function create_session(path, name)
 	if not path then
 		vim.notify("Path is required!", vim.log.levels.ERROR)
@@ -248,18 +246,10 @@ local function create_session(path, name)
 		local cmd
 		if vim.fn.filereadable(session_file) == 1 then
 			vim.notify("Session file found. Restoring session '" .. name .. "'...", vim.log.levels.INFO)
-			cmd = string.format(
-				'nohup nvim --listen "%s" -S "%s" >/dev/null 2>&1 &',
-				socket,
-				session_file
-			)
+			cmd = string.format('nohup nvim --listen "%s" -S "%s" >/dev/null 2>&1 &', socket, session_file)
 		else
 			-- Caso contrário, apenas abre Neovim no diretório
-			cmd = string.format(
-				'nohup nvim --listen "%s" -c "cd %s" >/dev/null 2>&1 &',
-				socket,
-				path
-			)
+			cmd = string.format('nohup nvim --listen "%s" -c "cd %s" >/dev/null 2>&1 &', socket, path)
 		end
 		vim.fn.system(cmd)
 	end
@@ -404,8 +394,9 @@ end
 ---   - `+1`: attach to the next session in the list
 ---   - `-1`: attach to the previous session
 ---   - a number: attach to the session at that index
+---   - a string: attach to the session by name
 --- Otherwise, shows a session picker for manual selection.
----@param arg? string|number|nil Session selector (`+1`, `-1`, index number, or nil for manual choice).
+---@param arg? string|number|nil Session selector (`+1`, `-1`, index number, name, or nil for manual choice).
 function M.attach_session(arg)
 	update_sessions()
 	if #M.sessions == 0 then
@@ -413,6 +404,7 @@ function M.attach_session(arg)
 		return
 	end
 
+	-- Handle relative (+1/-1) or numeric index
 	if arg == "+1" or arg == "-1" or tonumber(arg) then
 		if not M.current_index then
 			vim.notify("Current session not found, please select manually.", vim.log.levels.WARN)
@@ -440,8 +432,28 @@ function M.attach_session(arg)
 		vim.cmd("connect " .. socket)
 		vim.notify("Connected to session: " .. next_session .. " (index " .. new_index .. ")")
 		M.current_index = new_index
+
+	-- Handle string session name
+	elseif type(arg) == "string" and arg ~= "" then
+		local found_index
+		for i, name in ipairs(M.sessions) do
+			if name == arg then
+				found_index = i
+				break
+			end
+		end
+
+		if found_index then
+			local socket = sessions_dir .. "/" .. arg
+			vim.cmd("connect " .. socket)
+			vim.notify("Connected to session: " .. arg)
+			M.current_index = found_index
+		else
+			vim.notify("Session not found: " .. arg, vim.log.levels.ERROR)
+		end
+
+	-- Fallback: manual picker
 	else
-		-- Show session picker if no index or relative argument provided
 		vim.ui.select(M.sessions, { prompt = "Select a session to connect:" }, function(choice)
 			if choice then
 				local socket = sessions_dir .. "/" .. choice
