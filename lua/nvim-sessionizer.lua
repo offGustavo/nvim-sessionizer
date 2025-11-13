@@ -150,7 +150,7 @@ end
 ---applying highlights to keymaps and using specified separators.
 ---@return string # Formatted winbar string ready for vim.wo.winbar
 local function build_winbar()
-  -- TODO: Simplificar isso
+	-- TODO: Simplificar isso
 	local wb_cfg = config.ui.win.winbar
 	local fmt = wb_cfg.format(config)
 
@@ -561,8 +561,8 @@ end
 --- Otherwise, it will move one position down.
 --- The custom order (`M.session_order`) is updated after the move.
 ---
----@param line number The index (1-based) of the session to move.
----@param up? boolean If true, move the session up; if false or nil, move it down.
+---@param line integer The index (1-based) of the session to move.
+---@param up boolean If true, move the session up; if false or nil, move it down.
 ---@return boolean success True if the session was successfully moved, false otherwise.
 ---
 ---@example
@@ -600,6 +600,7 @@ local function move_session(line, up)
 		return true
 	end
 
+	render_sessions()
 	return false
 end
 
@@ -697,39 +698,52 @@ function M.manage_sessions(opts)
 		end
 	end
 
-	-- função para mover sessão para cima
-	local function move_up()
-		local line = vim.fn.line(".")
-		if move_session(line, true) then
-			render_sessions()
-			-- Move o cursor para acompanhar a sessão movida
-			vim.api.nvim_win_set_cursor(win, { line - 1, 0 })
-		end
-	end
+	-- Key mappings for session management in the session picker buffer
+	-- All mappings use the configured keybinds and are buffer-local with nowait
 
-	-- função para mover sessão para baixo
-	local function move_down()
-		local line = vim.fn.line(".")
-		if move_session(line, false) then
-			render_sessions()
-			-- Move o cursor para acompanhar a sessão movida
-			vim.api.nvim_win_set_cursor(win, { line + 1, 0 })
-		end
-	end
-
-	-- mapear <CR> para attach
+	-- Default: <CR> - Attach to the selected session
+	-- When pressed, attaches to the session at the current cursor line
+	-- Customize: Modify config.ui.keymap.attach to change this binding
 	vim.keymap.set("n", config.ui.keymap.attach, attach_session, { buffer = buf, nowait = true })
 
-	-- mapear D para remover sessão
+	-- Default: Shift+D - Delete the selected session
+	-- Removes the session at the current cursor line and updates the list
+	-- Customize: Modify config.ui.keymap.delete to change this binding
 	vim.keymap.set("n", config.ui.keymap.delete, remove_session, { buffer = buf, nowait = true })
 
-	-- mapear Shift+Up para mover sessão para cima
-	vim.keymap.set("n", config.ui.keymap.move_up, move_up, { buffer = buf, nowait = true })
+	-- Default: Shift+K - Move session up in the list
+	-- Moves the current session up one position and moves cursor to follow it
+	-- Customize: Modify config.ui.keymap.move_up to change this binding
+	vim.keymap.set("n", config.ui.keymap.move_up, function()
+		-- Get current cursor line (1-based index)
+		local line = vim.fn.line(".")
+		-- Attempt to move session up; if successful, update cursor position
+		if move_session(line, true) then
+			-- Move cursor up to follow the moved session
+			vim.api.nvim_win_set_cursor(win, { line - 1, 0 })
+		end
+		-- Refresh the session list display to show new order
+		render_sessions()
+	end, { buffer = buf, nowait = true })
 
-	-- mapear Shift+Down para mover sessão para baixo
-	vim.keymap.set("n", config.ui.keymap.move_down, move_down, { buffer = buf, nowait = true })
+	-- Default: Shift+J - Move session down in the list
+	-- Moves the current session down one position and moves cursor to follow it
+	-- Customize: Modify config.ui.keymap.move_down to change this binding
+	vim.keymap.set("n", config.ui.keymap.move_down, function()
+		-- Get current cursor line (1-based index)
+		local line = vim.fn.line(".")
+		-- Attempt to move session down; if successful, update cursor position
+		if move_session(line, false) then
+			-- Move cursor down to follow the moved session
+			vim.api.nvim_win_set_cursor(win, { line + 1, 0 })
+		end
+		-- Refresh the session list display to show new order
+		render_sessions()
+	end, { buffer = buf, nowait = true })
 
-	-- mapear q para fechar a janela
+	-- Default: q - Close the session management window
+	-- Safely closes the floating window without affecting sessions
+	-- Customize: Modify config.ui.keymap.quit to change this binding
 	vim.keymap.set("n", config.ui.keymap.quit, function()
 		vim.api.nvim_win_close(win, true)
 	end, { buffer = buf, nowait = true })
