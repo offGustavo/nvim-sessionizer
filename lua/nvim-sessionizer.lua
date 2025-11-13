@@ -150,7 +150,7 @@ end
 ---applying highlights to keymaps and using specified separators.
 ---@return string # Formatted winbar string ready for vim.wo.winbar
 local function build_winbar()
-  -- TODO: Simplificar isso
+	-- TODO: Simplificar isso
 	local wb_cfg = config.ui.win.winbar
 	local fmt = wb_cfg.format(config)
 
@@ -561,8 +561,8 @@ end
 --- Otherwise, it will move one position down.
 --- The custom order (`M.session_order`) is updated after the move.
 ---
----@param line number The index (1-based) of the session to move.
----@param up? boolean If true, move the session up; if false or nil, move it down.
+---@param line integer The index (1-based) of the session to move.
+---@param up boolean If true, move the session up; if false or nil, move it down.
 ---@return boolean success True if the session was successfully moved, false otherwise.
 ---
 ---@example
@@ -600,6 +600,7 @@ local function move_session(line, up)
 		return true
 	end
 
+	render_sessions()
 	return false
 end
 
@@ -697,37 +698,30 @@ function M.manage_sessions(opts)
 		end
 	end
 
-	-- função para mover sessão para cima
-	local function move_up()
-		local line = vim.fn.line(".")
-		if move_session(line, true) then
-			render_sessions()
-			-- Move o cursor para acompanhar a sessão movida
-			vim.api.nvim_win_set_cursor(win, { line - 1, 0 })
-		end
-	end
-
-	-- função para mover sessão para baixo
-	local function move_down()
-		local line = vim.fn.line(".")
-		if move_session(line, false) then
-			render_sessions()
-			-- Move o cursor para acompanhar a sessão movida
-			vim.api.nvim_win_set_cursor(win, { line + 1, 0 })
-		end
-	end
-
+	--TODO: improve docs here
+	--
 	-- mapear <CR> para attach
 	vim.keymap.set("n", config.ui.keymap.attach, attach_session, { buffer = buf, nowait = true })
 
 	-- mapear D para remover sessão
 	vim.keymap.set("n", config.ui.keymap.delete, remove_session, { buffer = buf, nowait = true })
 
-	-- mapear Shift+Up para mover sessão para cima
-	vim.keymap.set("n", config.ui.keymap.move_up, move_up, { buffer = buf, nowait = true })
+	vim.keymap.set("n", config.ui.keymap.move_up, function()
+		local line = vim.fn.line(".")
+		if move_session(line, true) then
+			-- Move o cursor para acompanhar a sessão movida
+			vim.api.nvim_win_set_cursor(win, { line - 1, 0 })
+		end
+    render_sessions()
+	end, { buffer = buf, nowait = true })
 
-	-- mapear Shift+Down para mover sessão para baixo
-	vim.keymap.set("n", config.ui.keymap.move_down, move_down, { buffer = buf, nowait = true })
+	vim.keymap.set("n", config.ui.keymap.move_down, function()
+		local line = vim.fn.line(".")
+		if move_session(line, false) then
+			vim.api.nvim_win_set_cursor(win, { line + 1, 0 })
+		end
+    render_sessions()
+	end, { buffer = buf, nowait = true })
 
 	-- mapear q para fechar a janela
 	vim.keymap.set("n", config.ui.keymap.quit, function()
