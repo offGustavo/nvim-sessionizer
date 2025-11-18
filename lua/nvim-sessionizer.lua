@@ -687,26 +687,8 @@ end
 	vim.bo[buf].bufhidden = "wipe"
 	vim.bo[buf].swapfile = false
 
-	-- função para remover sessão
-	local function remove_session()
-		local line = vim.fn.line(".")
-		local session = M.sessions[line]
-		if session then
-			M.remove_session(line)
-			vim.defer_fn(function()
-				update_sessions()
-				render_sessions()
-			end, 300)
 		end
-	end
 
-	-- função para fazer attach na sessão
-	local function attach_session()
-		local line = vim.fn.line(".")
-		local session = M.sessions[line]
-		if session then
-			M.attach_session(line)
-			vim.api.nvim_win_close(win, true)
 		end
 	end
 
@@ -716,12 +698,29 @@ end
 	-- Default: <CR> - Attach to the selected session
 	-- When pressed, attaches to the session at the current cursor line
 	-- Customize: Modify config.ui.keymap.attach to change this binding
-	vim.keymap.set("n", config.ui.keymap.attach, attach_session, { buffer = buf, nowait = true })
+	vim.keymap.set("n", config.ui.keymap.attach, function()
+		local line = vim.fn.line(".")
+		local session = M.sessions[line]
+		if session then
+			M.attach_session(line)
+			vim.api.nvim_win_close(win, true)
+		end
+	end, { buffer = buf, nowait = true })
 
 	-- Default: Shift+D - Delete the selected session
 	-- Removes the session at the current cursor line and updates the list
 	-- Customize: Modify config.ui.keymap.delete to change this binding
-	vim.keymap.set("n", config.ui.keymap.delete, remove_session, { buffer = buf, nowait = true })
+	vim.keymap.set("n", config.ui.keymap.delete, function()
+		local line = vim.fn.line(".")
+		local session = M.sessions[line]
+		if session then
+			M.remove_session(line)
+			vim.defer_fn(function()
+				update_sessions()
+				render_sessions()
+			end, 300)
+		end
+	end, { buffer = buf, nowait = true })
 
 	-- Default: Shift+K - Move session up in the list
 	-- Moves the current session up one position and moves cursor to follow it
