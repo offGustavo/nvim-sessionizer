@@ -644,53 +644,48 @@ function M.manage_sessions(opts)
 	)
 
 	local function render_sessions()
-    local formatted = {}
-    for i, name in ipairs(M.sessions) do
-        -- Usa apenas o número da linha para representar a ordem
-        table.insert(formatted, string.format("%s", name))
-    end
+		local formatted = {}
+		for i, name in ipairs(M.sessions) do
+			-- Usa apenas o número da linha para representar a ordem
+			table.insert(formatted, string.format("%s", name))
+		end
 
-    vim.bo[buf].modifiable = true
-    vim.api.nvim_buf_set_lines(buf, 0, -1, false, formatted)
-    vim.bo[buf].modifiable = false
+		vim.bo[buf].modifiable = true
+		vim.api.nvim_buf_set_lines(buf, 0, -1, false, formatted)
+		vim.bo[buf].modifiable = false
 
-    -- limpa signs antigos antes de aplicar de novo
-    vim.fn.sign_unplace("session_marks", { buffer = buf })
+		-- limpa signs antigos antes de aplicar de novo
+		vim.fn.sign_unplace("session_marks", { buffer = buf })
 
-    -- Atualiza o current_index para refletir a nova posição da sessão atual
-    if M.current_index then
-        local current_session = M.get_current_session()
-        -- Encontra a nova posição da sessão atual na lista reordenada
-        for i, name in ipairs(M.sessions) do
-            if name == current_session then
-                M.current_index = i
-                break
-            end
-        end
-    end
+		-- Atualiza o current_index para refletir a nova posição da sessão atual
+		if M.current_index then
+			local current_session = M.get_current_session()
+			-- Encontra a nova posição da sessão atual na lista reordenada
+			for i, name in ipairs(M.sessions) do
+				if name == current_session then
+					M.current_index = i
+					break
+				end
+			end
+		end
 
-    -- aplica mark na linha atual
-    if M.current_index and M.sessions[M.current_index] then
-        vim.fn.sign_place(
-            0, -- id (0 = auto)
-            "session_marks", -- group
-            "SessionMark", -- nome do sign definido
-            buf, -- buffer alvo
-            { lnum = M.current_index, priority = 10 }
-        )
-    end
-end
+		-- aplica mark na linha atual
+		if M.current_index and M.sessions[M.current_index] then
+			vim.fn.sign_place(
+				0, -- id (0 = auto)
+				"session_marks", -- group
+				"SessionMark", -- nome do sign definido
+				buf, -- buffer alvo
+				{ lnum = M.current_index, priority = 10 }
+			)
+		end
+	end
 
 	render_sessions()
 
 	vim.bo[buf].buftype = "nofile"
 	vim.bo[buf].bufhidden = "wipe"
 	vim.bo[buf].swapfile = false
-
-		end
-
-		end
-	end
 
 	-- Key mappings for session management in the session picker buffer
 	-- All mappings use the configured keybinds and are buffer-local with nowait
