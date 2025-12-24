@@ -697,8 +697,8 @@ function M.manage_sessions(opts)
 		local line = vim.fn.line(".")
 		local session = M.sessions[line]
 		if session then
-			M.attach_session(line)
 			vim.api.nvim_win_close(win, true)
+			M.attach_session(line)
 		end
 	end, { buffer = buf, nowait = true })
 
