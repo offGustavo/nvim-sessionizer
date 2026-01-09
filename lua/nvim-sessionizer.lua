@@ -86,6 +86,9 @@ local config = {
 	},
 }
 
+--- Update Sessionzer config based on user config
+config = vim.tbl_extend("force", config, vim.g.sessionizer or {})
+
 ---Save the session order to a file.
 ---@return nil
 local function save_session_order()
@@ -188,7 +191,7 @@ end
 
 --- Update the session list and set the current index.
 --- @return nil
-local function update_sessions()
+function M.update_sessions()
 	local sessions = vim.fn.globpath(sessions_dir, "*", false, true)
 	M.sessions = {}
 	for _, path in ipairs(sessions) do
@@ -398,7 +401,7 @@ end
 --- Otherwise, shows a session picker for manual selection.
 ---@param arg? string|number|nil Session selector (`+1`, `-1`, index number, name, or nil for manual choice).
 function M.attach_session(arg)
-	update_sessions()
+	M.update_sessions()
 	if #M.sessions == 0 then
 		vim.notify("No sessions found", vim.log.levels.WARN)
 		return
@@ -459,7 +462,7 @@ function M.attach_session(arg)
 				local socket = sessions_dir .. "/" .. choice
 				vim.cmd("connect " .. socket)
 				vim.notify("Connected to session: " .. choice)
-				update_sessions()
+				M.update_sessions()
 			end
 		end)
 	end
@@ -471,7 +474,7 @@ end
 ---@param name? string  # Optional session name
 ---@return nil
 function M.remove_session(id, name)
-	update_sessions()
+	M.update_sessions()
 	if #M.sessions == 0 then
 		vim.notify("No sessions to remove", vim.log.levels.WARN)
 		return
@@ -512,7 +515,7 @@ function M.remove_session(id, name)
 			vim.defer_fn(function()
 				vim.fn.delete(socket)
 				vim.notify("Session removed: " .. target_session)
-				update_sessions()
+				M.update_sessions()
 				-- Atualiza a ordem após remover a sessão
 				for i, session_name in ipairs(M.session_order) do
 					if session_name == target_session then
@@ -537,7 +540,7 @@ function M.remove_session(id, name)
 					vim.defer_fn(function()
 						vim.fn.delete(socket)
 						vim.notify("Session removed: " .. choice)
-						update_sessions()
+						M.update_sessions()
 						-- Atualiza a ordem após remover a sessão
 						for i, session_name in ipairs(M.session_order) do
 							if session_name == choice then
@@ -611,7 +614,7 @@ function M.manage_sessions(opts)
 	local width_ratio = opts.width or config.ui.win.width
 	local height_ratio = opts.height or config.ui.win.height
 
-	update_sessions()
+	M.update_sessions()
 	if #M.sessions == 0 then
 		vim.notify("No active sessions", vim.log.levels.INFO)
 		return
@@ -711,7 +714,7 @@ function M.manage_sessions(opts)
 		if session then
 			M.remove_session(line)
 			vim.defer_fn(function()
-				update_sessions()
+				M.update_sessions()
 				render_sessions()
 			end, 300)
 		end
@@ -762,43 +765,6 @@ function M.sessionizer()
 	select_project(function(path)
 		create_session(path)
 	end)
-end
-
----Setup function for Sessionizer
----@param user_config? SessionizerConfig User configuration to override defaults
-function M.setup(user_config)
-	config = vim.tbl_extend("force", config, user_config or {})
-
-	-- Carrega a ordem das sessões ao inicializar
-	load_session_order()
-
-	vim.api.nvim_create_user_command("Sessionizer", function(opts)
-		local sub = opts.fargs[1]
-		if sub == "new" then
-			M.new_session()
-		elseif sub == "attach" then
-			M.attach_session(opts.fargs[2])
-		elseif sub == "remove" then
-			M.remove_session()
-		elseif sub == "manage" then
-			M.manage_sessions()
-		elseif not sub then
-			M.sessionizer()
-		end
-	end, {
-		nargs = "*",
-		complete = function(_, line)
-			local words = vim.split(line, "%s+")
-			local n = #words
-			if n == 2 then
-				return { "new", "attach", "remove", "manage" }
-			elseif n == 3 and words[2] == "attach" then
-				update_sessions()
-				return M.sessions or {}
-			end
-			return {}
-		end,
-	})
 end
 
 return M
