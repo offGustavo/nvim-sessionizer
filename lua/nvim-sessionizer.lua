@@ -1,6 +1,6 @@
 local M = {}
 
-local sessions_dir = vim.fn.expand("/tmp/nvim-sessions/")
+local sessions_dir = vim.fn.expand("/tmp/nvim-sessionizer/")
 vim.fn.mkdir(sessions_dir, "p")
 
 M.sessions = {}
