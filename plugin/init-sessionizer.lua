@@ -1,3 +1,8 @@
+if vim.g.loaded_nvim_sessionizer == 1 then
+  return
+end
+vim.g.loaded_nvim_sessionizer = 1
+
 vim.api.nvim_create_user_command("Sessionizer", function(opts)
 	local sub = opts.fargs[1]
 	if sub == "new" then
