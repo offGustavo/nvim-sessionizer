@@ -631,6 +631,7 @@ local function move_session(line, up)
 	return false
 end
 
+-- TASK(20260109-172456): Make `manage_sessions` use a real buffer
 --- List all available sessions in an interactive buffer
 ---@param opts? table config
 function M.manage_sessions(opts)
