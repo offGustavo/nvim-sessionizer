@@ -5,7 +5,7 @@
     elseif sub == "attach" then
       require("nvim-sessionizer").attach_session(opts.fargs[2])
     elseif sub == "remove" then
-      require("nvim-sessionizer").remove_session()
+      require("nvim-sessionizer").remove_session(nil, opts.fargs[2])
     elseif sub == "manage" then
       require("nvim-sessionizer").manage_sessions()
     elseif not sub then
@@ -18,6 +18,10 @@
       local n = #words
       if n == 2 then
         return { "new", "attach", "remove", "manage" }
+        -- TASK(20260109-153624): Make `new` and `remove` work like `attach` 
+      elseif n == 3 and words[2] == "remove" then
+        require("nvim-sessionizer").update_sessions()
+        return require("nvim-sessionizer").sessions or {}
       elseif n == 3 and words[2] == "attach" then
         require("nvim-sessionizer").update_sessions()
         return require("nvim-sessionizer").sessions or {}
