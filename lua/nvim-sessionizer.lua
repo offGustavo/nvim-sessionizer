@@ -263,11 +263,34 @@ local function create_session(path, name)
 	end, 500)
 end
 
---- Select a project directory using zoxide, find, or configured search paths,
---- and call the provided callback with the selected path.
----@param callback fun(path:string) Function to call with the selected project path.
----@return nil
-local function select_project(callback)
+--- Retrieve a list of directories for selection.
+---
+--- This function attempts to get directories in the following order:
+--- 1. First tries to use zoxide if available and not disabled in config
+---    - Returns directories with scores from zoxide query
+---    - Format: "score path" for display
+--- 2. Falls back to using find command in configured search directories
+---    - Searches directories specified in config.search_dirs
+---    - Respects config.max_depth (default: 3)
+---
+---@return table[] # Array of directory items, each containing:
+---   - path (string): Full path to the directory
+---   - display (string): Formatted display string for UI presentation
+---   Returns empty table if no directories found or on error
+---
+---@note The function validates that search directories exist before using them
+---@warning If neither zoxide nor find are available, returns empty table with error notification
+---
+---@example Return structure:
+---   {
+---     { path = "/home/user/projects", display = "20 /home/user/projects" },  -- from zoxide
+---     { path = "/tmp/test", display = "/tmp/test" }                         -- from find
+---   }
+---
+---@see config.no_zoxide Configuration flag to disable zoxide usage
+---@see config.search_dirs List of directories to search when zoxide is unavailable
+---@see config.max_depth Maximum directory depth for find command (default: 3)
+function M.get_dirs()
 	local results = {}
 
 	-- 1. Try zoxide if available and not disabled
@@ -275,6 +298,7 @@ local function select_project(callback)
 		results = vim.fn.systemlist("zoxide query -l -s", nil, 1)
 		if #results == 0 then
 			vim.notify("No directories found by zoxide", vim.log.levels.WARN)
+			return {}
 		end
 
 		local items = {}
@@ -287,22 +311,7 @@ local function select_project(callback)
 				})
 			end
 		end
-
-		if #items > 0 then
-			vim.ui.select(items, {
-				prompt = "Select a project:",
-				format_item = function(item)
-					return item.display
-				end,
-			}, function(choice)
-				if choice and choice.path then
-					callback(choice.path)
-				else
-					vim.notify("No project selected", vim.log.levels.WARN)
-				end
-			end)
-			return
-		end
+		return items
 	end
 
 	-- 2. Collect existing search directories from config
@@ -316,7 +325,7 @@ local function select_project(callback)
 
 	if #existing_dirs == 0 then
 		vim.notify("No valid search directories found", vim.log.levels.ERROR)
-		return
+		return {}
 	end
 
 	-- 3. Build search command using `find` (TODO: add fd command support)
@@ -329,18 +338,18 @@ local function select_project(callback)
 		)
 	else
 		vim.notify("Neither zoxide, fd, nor find are available", vim.log.levels.ERROR)
-		return
+		return {}
 	end
 
 	results = vim.fn.systemlist(cmd, nil, 1)
 	if vim.v.shell_error ~= 0 then
 		vim.notify("Command failed: " .. cmd, vim.log.levels.ERROR)
-		return
+		return {}
 	end
 
 	if #results == 0 then
 		vim.notify("No directories found", vim.log.levels.WARN)
-		return
+		return {}
 	end
 
 	-- 4. Prepare items for selection
@@ -349,8 +358,21 @@ local function select_project(callback)
 		table.insert(items, { path = path, display = path })
 	end
 
-	--TODO: move this to the sessionizer fucntion
-	-- 5. Use vim.ui.select to show picker
+	return items
+end
+
+--- Select a project directory using zoxide or find in configured search paths,
+--- and call the provided callback with the selected path.
+---@param callback fun(path:string) Function to call with the selected project path.
+---@return nil
+local function select_project(callback)
+	local items = M.get_dirs()
+
+	if #items == 0 then
+		return
+	end
+
+	-- Use vim.ui.select to show picker
 	vim.ui.select(items, {
 		prompt = "Select a project:",
 		format_item = function(item)
@@ -365,31 +387,33 @@ local function select_project(callback)
 	end)
 end
 
+--- TODO: Improve the lua doc
 --- Create a new session in the current working directory.
 --- Prompts the user for a session name, then calls `create_session`.
 --- If the user presses <Esc>, the operation is canceled.
 --- If the user presses <Enter> without typing a name, a new session will be created
 --- using the current directory name as default.
+--- @param path? string
 ---@return nil
-function M.new_session()
-	vim.ui.input({ prompt = "Session name: " }, function(name)
-		local path = vim.uv.cwd() .. ""
-
-		if name == nil then
-			vim.notify("Operation canceled. Session not created.", vim.log.levels.WARN)
-			return
-		end
-
-		if name == "" then
-			name = vim.fn.fnamemodify(path, ":t"):gsub("%.", "_")
-			vim.notify("No session name provided. Using default: " .. name, vim.log.levels.INFO)
-		end
-
-		local session_file = sessions_dir .. "/" .. name .. ".vim"
-		vim.cmd("mksession! " .. vim.fn.fnameescape(session_file))
-
-		create_session(path, name)
-	end)
+function M.new_session(path)
+	if path then
+		create_session(path, nil)
+	else
+		vim.ui.input({ prompt = "Session name: " }, function(name)
+			local path = vim.uv.cwd() .. ""
+			if name == nil then
+				vim.notify("Operation canceled. Session not created.", vim.log.levels.WARN)
+				return
+			end
+			if name == "" then
+				name = vim.fn.fnamemodify(path, ":t"):gsub("%.", "_")
+				vim.notify("No session name provided. Using default: " .. name, vim.log.levels.INFO)
+			end
+			local session_file = sessions_dir .. "/" .. name .. ".vim"
+			vim.cmd("mksession! " .. vim.fn.fnameescape(session_file))
+			create_session(path, name)
+		end)
+	end
 end
 
 --- Attach to an existing session.

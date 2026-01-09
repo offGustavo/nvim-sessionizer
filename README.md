@@ -39,6 +39,7 @@ This is **not** a terminal multiplexer. It’s strictly a session manager to mak
 
 ## Install
 
+<!-- TODO: update the install with new `vim.g.sessionizer` -->
 ### With [folke/lazy.nvim](https://github.com/folke/lazy.nvim)
 
 ```lua
