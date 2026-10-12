@@ -1,10 +1,9 @@
 # Make `new` and `remove` work like `attach` 
 
-## Statistics:
-
 - TYPE: TODO
-- STATUS: DONE
+- STATUS: CLOSED
 - PRIORITY: 70
+- TAGS:
 - OPEN DATE (UTC): 2026/01/09 15:36:24
 - CLOSE DATE (UTC): 2026-01-09 17:05:42
 
